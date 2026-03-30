@@ -7,172 +7,201 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Arial, sans-serif; background: #0f0f0f; color: #fff; padding: 20px; }
-
-/* TOPBAR */
-.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-.logo { font-size: 22px; font-weight: bold; color: #4a9eff; letter-spacing: -0.5px; }
-.logo span { color: #666; font-size: 14px; font-weight: normal; margin-left: 8px; }
-.switcher { display: flex; gap: 6px; background: #1a1a1a; padding: 4px; border-radius: 10px; }
-.sw-btn { padding: 7px 16px; border-radius: 7px; font-size: 13px; cursor: pointer; border: none; background: transparent; color: #888; font-family: Arial; }
-.sw-btn.active { background: #2a2a2a; color: #fff; font-weight: bold; }
-.period-btns { display: flex; gap: 6px; }
-.pbtn { font-size: 12px; padding: 6px 14px; border: 1px solid #333; border-radius: 7px; cursor: pointer; background: transparent; color: #888; font-family: Arial; }
-.pbtn.active { background: #2a2a2a; color: #fff; border-color: #555; }
-
-/* METRICS */
-.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-.metric { background: #1a1a1a; border-radius: 12px; padding: 16px; }
-.metric-label { font-size: 12px; color: #666; margin-bottom: 6px; }
-.metric-val { font-size: 22px; font-weight: bold; }
-.metric-delta { font-size: 12px; margin-top: 4px; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #0f0f0f; color: #fff; padding: 16px; font-size: 14px; }
+.topbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; gap: 10px; flex-wrap: wrap; }
+.logo { font-size: 20px; font-weight: 700; color: #4a9eff; }
+.logo span { color: #555; font-size: 12px; font-weight: 400; display: block; margin-top: 2px; }
+.controls { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.switcher { display: flex; gap: 4px; background: #1a1a1a; padding: 3px; border-radius: 8px; }
+.sw-btn { padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; border: none; background: transparent; color: #666; font-family: inherit; }
+.sw-btn.active { background: #2a2a2a; color: #fff; font-weight: 600; }
+.period-btns { display: flex; gap: 4px; }
+.pbtn { font-size: 11px; padding: 5px 10px; border: 1px solid #2a2a2a; border-radius: 6px; cursor: pointer; background: transparent; color: #666; font-family: inherit; }
+.pbtn.active { background: #2a2a2a; color: #fff; border-color: #444; }
+.alert { background: #2d1a1a; border: 1px solid #5a2020; border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: 12px; color: #ff6b6b; display: none; }
+.alert.show { display: block; }
+.metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
+@media(min-width:600px) { .metrics { grid-template-columns: repeat(4, 1fr); } }
+.metric { background: #1a1a1a; border-radius: 10px; padding: 12px; }
+.metric-label { font-size: 11px; color: #555; margin-bottom: 4px; }
+.metric-val { font-size: 18px; font-weight: 700; line-height: 1.2; }
+.metric-delta { font-size: 11px; margin-top: 4px; }
 .green { color: #4caf50; }
 .red { color: #f44336; }
-
-/* PANELS */
-.row2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; margin-bottom: 12px; }
-.panel { background: #1a1a1a; border-radius: 12px; padding: 16px; }
-.panel-title { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; font-weight: bold; }
-
-/* LEGEND */
-.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
-.leg { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #888; }
-.leg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-
-/* FUNNEL */
-.funnel-row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #222; font-size: 13px; gap: 10px; }
+.amber { color: #f39c12; }
+.row2 { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 10px; }
+@media(min-width:600px) { .row2 { grid-template-columns: 1.6fr 1fr; } }
+.panel { background: #1a1a1a; border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+.panel-title { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.leg { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #777; }
+.leg-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.funnel-row { display: flex; align-items: center; padding: 7px 0; border-bottom: 1px solid #222; font-size: 12px; gap: 8px; }
 .funnel-row:last-child { border-bottom: none; }
-.funnel-label { min-width: 100px; color: #888; }
-.funnel-bar-wrap { flex: 1; background: #222; border-radius: 4px; height: 8px; overflow: hidden; }
-.funnel-bar { height: 100%; border-radius: 4px; }
-.funnel-val { min-width: 50px; text-align: right; font-weight: bold; font-size: 13px; }
-
-/* CHANNELS */
-.ch-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #222; font-size: 13px; }
+.funnel-label { min-width: 90px; color: #777; font-size: 11px; }
+.funnel-bar-wrap { flex: 1; background: #222; border-radius: 3px; height: 6px; overflow: hidden; }
+.funnel-bar { height: 100%; border-radius: 3px; }
+.funnel-val { min-width: 44px; text-align: right; font-weight: 700; font-size: 12px; }
+.ch-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #222; font-size: 12px; }
 .ch-row:last-child { border-bottom: none; }
-.ch-name { min-width: 90px; color: #888; }
-.ch-bar-wrap { flex: 1; background: #222; border-radius: 4px; height: 8px; overflow: hidden; }
-.ch-bar { height: 100%; border-radius: 4px; }
-.ch-val { min-width: 65px; text-align: right; font-weight: bold; }
-.ch-roas { min-width: 36px; text-align: right; font-size: 12px; }
-
-/* BLOGGERS TABLE */
-.bloggers-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.bloggers-table th { text-align: left; color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 8px 10px; border-bottom: 1px solid #222; font-weight: bold; }
-.bloggers-table td { padding: 10px 8px; border-bottom: 1px solid #1e1e1e; vertical-align: middle; }
+.ch-name { min-width: 80px; color: #777; font-size: 11px; }
+.ch-bar-wrap { flex: 1; background: #222; border-radius: 3px; height: 6px; overflow: hidden; }
+.ch-bar { height: 100%; border-radius: 3px; }
+.ch-val { min-width: 60px; text-align: right; font-weight: 700; font-size: 12px; }
+.ch-roas { min-width: 34px; text-align: right; font-size: 11px; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.bloggers-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 480px; }
+.bloggers-table th { text-align: left; color: #444; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 5px 8px 8px; border-bottom: 1px solid #222; font-weight: 700; }
+.bloggers-table td { padding: 9px 8px; border-bottom: 1px solid #1e1e1e; vertical-align: middle; }
 .bloggers-table tr:last-child td { border-bottom: none; }
-.roas-bar-wrap { background: #222; border-radius: 4px; height: 6px; width: 70px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }
-.roas-bar { height: 100%; border-radius: 4px; background: #4caf50; }
-.badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: bold; }
+.roas-bar-wrap { background: #222; border-radius: 3px; height: 5px; width: 50px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 5px; }
+.roas-bar { height: 100%; border-radius: 3px; background: #4caf50; }
+.badge { font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 700; }
 .badge-inst { background: #2d1f3d; color: #b57bee; }
 .badge-vk { background: #1a2a3d; color: #4a9eff; }
 .badge-tg { background: #1a3d2d; color: #4caf50; }
-
-/* LINE CHART */
+.dish-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #222; font-size: 12px; }
+.dish-row:last-child { border-bottom: none; }
+.dish-name { color: #ccc; }
+.dish-stats { display: flex; gap: 12px; font-size: 11px; color: #555; }
+.dish-stat { text-align: right; }
+.dish-stat span { display: block; font-weight: 700; color: #fff; font-size: 12px; }
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.compare-card { background: #111; border-radius: 8px; padding: 12px; border: 1px solid #222; }
+.compare-title { font-size: 12px; font-weight: 700; margin-bottom: 10px; color: #4a9eff; }
+.compare-row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-bottom: 1px solid #1a1a1a; }
+.compare-row:last-child { border-bottom: none; }
+.compare-label { color: #555; }
+.compare-val { font-weight: 600; }
+.budget-row { display: flex; align-items: center; padding: 7px 0; border-bottom: 1px solid #222; font-size: 12px; gap: 8px; }
+.budget-row:last-child { border-bottom: none; }
+.budget-channel { color: #ccc; min-width: 80px; font-size: 11px; }
+.budget-bar-wrap { flex: 1; background: #222; border-radius: 3px; height: 5px; overflow: hidden; }
+.budget-bar { height: 100%; border-radius: 3px; }
+.budget-spent { color: #f39c12; min-width: 58px; text-align: right; font-size: 11px; }
+.budget-earned { color: #4caf50; min-width: 65px; text-align: right; font-weight: 700; font-size: 12px; }
+.save-block { background: #1a2d1a; border-radius: 10px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 8px; }
+.save-text { font-size: 13px; color: #4caf50; }
+.save-val { font-size: 18px; font-weight: 700; color: #4caf50; }
 .chart-wrap { position: relative; height: 160px; }
-
-/* SAVE BLOCK */
-.save-block { background: #1a2d1a; border-radius: 12px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
-.save-text { font-size: 14px; color: #4caf50; }
-.save-val { font-size: 20px; font-weight: bold; color: #4caf50; }
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <div>
-    <div class="logo">Axis <span>сквозная аналитика</span></div>
-  </div>
-  <div class="switcher">
-    <button class="sw-btn active" onclick="setCompany('proporcia',this)">Пропорция</button>
-    <button class="sw-btn" onclick="setCompany('mangal',this)">Мангал и мясо</button>
-  </div>
-  <div class="period-btns">
-    <button class="pbtn" onclick="setPeriod('week',this)">Неделя</button>
-    <button class="pbtn active" onclick="setPeriod('month',this)">Март</button>
-    <button class="pbtn" onclick="setPeriod('quarter',this)">Квартал</button>
+  <div><div class="logo">Axis <span>сквозная аналитика</span></div></div>
+  <div class="controls">
+    <div class="switcher">
+      <button class="sw-btn active" onclick="setCompany('proporcia',this)">Пропорция</button>
+      <button class="sw-btn" onclick="setCompany('mangal',this)">Мангал и мясо</button>
+    </div>
+    <div class="period-btns">
+      <button class="pbtn" onclick="setPeriod('week',this)">Неделя</button>
+      <button class="pbtn active" onclick="setPeriod('month',this)">Март</button>
+      <button class="pbtn" onclick="setPeriod('quarter',this)">Квартал</button>
+    </div>
   </div>
 </div>
 
+<div class="alert" id="roas-alert">⚠️ ROAS по Директу упал ниже 3× — проверьте кампании</div>
+
 <div class="metrics">
-  <div class="metric">
-    <div class="metric-label">Выручка</div>
-    <div class="metric-val" id="m-rev">847 300 ₽</div>
-    <div class="metric-delta green" id="m-rev-d">+14% к прошлому</div>
-  </div>
-  <div class="metric">
-    <div class="metric-label">Заказов</div>
-    <div class="metric-val" id="m-ord">1 243</div>
-    <div class="metric-delta green" id="m-ord-d">+9% к прошлому</div>
-  </div>
-  <div class="metric">
-    <div class="metric-label">CAC (стоимость клиента)</div>
-    <div class="metric-val" id="m-cac">312 ₽</div>
-    <div class="metric-delta green" id="m-cac-d">-18 ₽ к прошлому</div>
-  </div>
-  <div class="metric">
-    <div class="metric-label">ROAS</div>
-    <div class="metric-val" id="m-roas">4.2×</div>
-    <div class="metric-delta green" id="m-roas-d">+0.4 к прошлому</div>
-  </div>
+  <div class="metric"><div class="metric-label">Выручка</div><div class="metric-val" id="m-rev">847 300 ₽</div><div class="metric-delta green" id="m-rev-d">+14%</div></div>
+  <div class="metric"><div class="metric-label">Заказов</div><div class="metric-val" id="m-ord">1 243</div><div class="metric-delta green" id="m-ord-d">+9%</div></div>
+  <div class="metric"><div class="metric-label">Средний чек</div><div class="metric-val" id="m-check">681 ₽</div><div class="metric-delta green" id="m-check-d">+5%</div></div>
+  <div class="metric"><div class="metric-label">ROAS</div><div class="metric-val" id="m-roas">4.2×</div><div class="metric-delta green" id="m-roas-d">+0.4</div></div>
+</div>
+<div class="metrics">
+  <div class="metric"><div class="metric-label">CAC</div><div class="metric-val" id="m-cac">312 ₽</div><div class="metric-delta green" id="m-cac-d">-18 ₽</div></div>
+  <div class="metric"><div class="metric-label">LTV клиента</div><div class="metric-val" id="m-ltv">2 840 ₽</div><div class="metric-delta green" id="m-ltv-d">+12%</div></div>
+  <div class="metric"><div class="metric-label">Новые клиенты</div><div class="metric-val" id="m-new">68%</div><div class="metric-delta amber" id="m-new-d">-2% повторных</div></div>
+  <div class="metric"><div class="metric-label">Расходы на рекламу</div><div class="metric-val" id="m-spend">201 500 ₽</div><div class="metric-delta red" id="m-spend-d">+8%</div></div>
 </div>
 
 <div class="row2">
   <div class="panel">
-    <div class="panel-title">Заказы по каналам — март</div>
+    <div class="panel-title">Заказы по каналам</div>
     <div class="legend">
       <div class="leg"><div class="leg-dot" style="background:#4a9eff"></div>ВКонтакте 42%</div>
       <div class="leg"><div class="leg-dot" style="background:#9b59b6"></div>Блогеры 28%</div>
       <div class="leg"><div class="leg-dot" style="background:#4caf50"></div>Telegram 18%</div>
       <div class="leg"><div class="leg-dot" style="background:#f39c12"></div>Сайт 12%</div>
     </div>
-    <div style="position:relative;height:200px;"><canvas id="ch1"></canvas></div>
+    <div style="position:relative;height:180px;"><canvas id="ch1"></canvas></div>
   </div>
   <div class="panel">
     <div class="panel-title">Воронка продаж</div>
-    <div class="funnel-row"><div class="funnel-label">Клики</div><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:100%;background:#4a9eff"></div></div><div class="funnel-val" id="f1">12 840</div></div>
-    <div class="funnel-row"><div class="funnel-label">Заявки</div><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:62%;background:#9b59b6"></div></div><div class="funnel-val" id="f2">62%</div></div>
-    <div class="funnel-row"><div class="funnel-label">Подтверждены</div><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:38%;background:#4caf50"></div></div><div class="funnel-val" id="f3">38%</div></div>
-    <div class="funnel-row"><div class="funnel-label">Доставлены</div><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:34%;background:#f39c12"></div></div><div class="funnel-val" id="f4">34%</div></div>
-    <div class="funnel-row"><div class="funnel-label">Повторный</div><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:18%;background:#e74c3c"></div></div><div class="funnel-val" id="f5">18%</div></div>
+    <div class="funnel-row"><div class="funnel-label">Клики</div><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:100%;background:#4a9eff"></div></div><div class="funnel-val">12 840</div></div>
+    <div class="funnel-row"><div class="funnel-label">Заявки</div><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:62%;background:#9b59b6"></div></div><div class="funnel-val">62%</div></div>
+    <div class="funnel-row"><div class="funnel-label">Подтверждены</div><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:38%;background:#4caf50"></div></div><div class="funnel-val">38%</div></div>
+    <div class="funnel-row"><div class="funnel-label">Доставлены</div><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:34%;background:#f39c12"></div></div><div class="funnel-val">34%</div></div>
+    <div class="funnel-row"><div class="funnel-label">Повторный</div><div class="funnel-bar-wrap"><div class="funnel-bar" style="width:18%;background:#e74c3c"></div></div><div class="funnel-val">18%</div></div>
   </div>
 </div>
 
-<div class="panel" style="margin-bottom:12px;">
-  <div class="panel-title">Блогеры и UGC — эффективность</div>
-  <table class="bloggers-table">
-    <thead>
-      <tr>
-        <th>Блогер</th>
-        <th>Канал</th>
-        <th>Переходов</th>
-        <th>Заказов</th>
-        <th>Выручка</th>
-        <th>CAC</th>
-        <th>ROAS</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td style="font-weight:bold">@masha_food</td><td><span class="badge badge-inst">Inst</span></td><td>2 140</td><td>87</td><td>94 350 ₽</td><td>230 ₽</td><td><div class="roas-bar-wrap"><div class="roas-bar" style="width:85%"></div></div><span class="green">5.1×</span></td></tr>
-      <tr><td style="font-weight:bold">@tyumen_life</td><td><span class="badge badge-vk">ВК</span></td><td>1 830</td><td>64</td><td>68 200 ₽</td><td>280 ₽</td><td><div class="roas-bar-wrap"><div class="roas-bar" style="width:70%"></div></div><span class="green">4.2×</span></td></tr>
-      <tr><td style="font-weight:bold">@food_tumen</td><td><span class="badge badge-tg">TG</span></td><td>1 240</td><td>51</td><td>55 100 ₽</td><td>310 ₽</td><td><div class="roas-bar-wrap"><div class="roas-bar" style="width:60%"></div></div><span class="green">3.6×</span></td></tr>
-      <tr><td style="font-weight:bold">@sushi_review</td><td><span class="badge badge-inst">Inst</span></td><td>980</td><td>29</td><td>31 400 ₽</td><td>490 ₽</td><td><div class="roas-bar-wrap"><div class="roas-bar" style="width:35%;background:#e74c3c"></div></div><span class="red">2.1×</span></td></tr>
-    </tbody>
-  </table>
-</div>
-
-<div class="panel" style="margin-bottom:12px;">
-  <div class="panel-title">Выручка по дням — март</div>
+<div class="panel">
+  <div class="panel-title">Выручка по дням</div>
   <div class="chart-wrap"><canvas id="ch2"></canvas></div>
 </div>
 
-<div class="panel" style="margin-bottom:12px;">
+<div class="panel">
+  <div class="panel-title">Расходы vs выручка по каналам</div>
+  <div class="budget-row"><div class="budget-channel">ВКонтакте</div><div class="budget-bar-wrap"><div class="budget-bar" style="width:85%;background:#4a9eff"></div></div><div class="budget-spent">42 000 ₽</div><div class="budget-earned">218 400 ₽</div></div>
+  <div class="budget-row"><div class="budget-channel">Блогеры</div><div class="budget-bar-wrap"><div class="budget-bar" style="width:62%;background:#9b59b6"></div></div><div class="budget-spent">33 100 ₽</div><div class="budget-earned">159 000 ₽</div></div>
+  <div class="budget-row"><div class="budget-channel">Telegram</div><div class="budget-bar-wrap"><div class="budget-bar" style="width:45%;background:#4caf50"></div></div><div class="budget-spent">29 400 ₽</div><div class="budget-earned">115 000 ₽</div></div>
+  <div class="budget-row"><div class="budget-channel">Директ</div><div class="budget-bar-wrap"><div class="budget-bar" style="width:28%;background:#e74c3c"></div></div><div class="budget-spent">27 800 ₽</div><div class="budget-earned">78 000 ₽</div></div>
+</div>
+
+<div class="panel">
   <div class="panel-title">ROAS по каналам</div>
-  <div id="channels-list">
-    <div class="ch-row"><div class="ch-name">ВКонтакте</div><div class="ch-bar-wrap"><div class="ch-bar" style="width:85%;background:#4a9eff"></div></div><div class="ch-val">218к ₽</div><div class="ch-roas green">5.2×</div></div>
-    <div class="ch-row"><div class="ch-name">Блогеры</div><div class="ch-bar-wrap"><div class="ch-bar" style="width:62%;background:#9b59b6"></div></div><div class="ch-val">159к ₽</div><div class="ch-roas green">4.8×</div></div>
-    <div class="ch-row"><div class="ch-name">Telegram</div><div class="ch-bar-wrap"><div class="ch-bar" style="width:45%;background:#4caf50"></div></div><div class="ch-val">115к ₽</div><div class="ch-roas green">3.9×</div></div>
-    <div class="ch-row"><div class="ch-name">Директ</div><div class="ch-bar-wrap"><div class="ch-bar" style="width:30%;background:#f39c12"></div></div><div class="ch-val">78к ₽</div><div class="ch-roas" style="color:#f39c12">2.8×</div></div>
+  <div class="ch-row"><div class="ch-name">ВКонтакте</div><div class="ch-bar-wrap"><div class="ch-bar" style="width:85%;background:#4a9eff"></div></div><div class="ch-val">218к ₽</div><div class="ch-roas green">5.2×</div></div>
+  <div class="ch-row"><div class="ch-name">Блогеры</div><div class="ch-bar-wrap"><div class="ch-bar" style="width:62%;background:#9b59b6"></div></div><div class="ch-val">159к ₽</div><div class="ch-roas green">4.8×</div></div>
+  <div class="ch-row"><div class="ch-name">Telegram</div><div class="ch-bar-wrap"><div class="ch-bar" style="width:45%;background:#4caf50"></div></div><div class="ch-val">115к ₽</div><div class="ch-roas green">3.9×</div></div>
+  <div class="ch-row"><div class="ch-name">Директ</div><div class="ch-bar-wrap"><div class="ch-bar" style="width:28%;background:#e74c3c"></div></div><div class="ch-val">78к ₽</div><div class="ch-roas red">2.8×</div></div>
+</div>
+
+<div class="panel">
+  <div class="panel-title">Блогеры и UGC — эффективность</div>
+  <div class="table-wrap">
+    <table class="bloggers-table">
+      <thead><tr><th>Блогер</th><th>Канал</th><th>Переходов</th><th>Заказов</th><th>Выручка</th><th>CAC</th><th>ROAS</th></tr></thead>
+      <tbody>
+        <tr><td style="font-weight:700">@masha_food</td><td><span class="badge badge-inst">Inst</span></td><td>2 140</td><td>87</td><td>94 350 ₽</td><td>230 ₽</td><td><div class="roas-bar-wrap"><div class="roas-bar" style="width:85%"></div></div><span class="green">5.1×</span></td></tr>
+        <tr><td style="font-weight:700">@tyumen_life</td><td><span class="badge badge-vk">ВК</span></td><td>1 830</td><td>64</td><td>68 200 ₽</td><td>280 ₽</td><td><div class="roas-bar-wrap"><div class="roas-bar" style="width:70%"></div></div><span class="green">4.2×</span></td></tr>
+        <tr><td style="font-weight:700">@food_tumen</td><td><span class="badge badge-tg">TG</span></td><td>1 240</td><td>51</td><td>55 100 ₽</td><td>310 ₽</td><td><div class="roas-bar-wrap"><div class="roas-bar" style="width:60%"></div></div><span class="green">3.6×</span></td></tr>
+        <tr><td style="font-weight:700">@sushi_review</td><td><span class="badge badge-inst">Inst</span></td><td>980</td><td>29</td><td>31 400 ₽</td><td>490 ₽</td><td><div class="roas-bar-wrap"><div class="roas-bar" style="width:35%;background:#e74c3c"></div></div><span class="red">2.1×</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-title">Топ блюд с рекламы</div>
+  <div class="dish-row"><div class="dish-name">Ролл Филадельфия</div><div class="dish-stats"><div class="dish-stat">Заказов<span>312</span></div><div class="dish-stat">Выручка<span>93 600 ₽</span></div></div></div>
+  <div class="dish-row"><div class="dish-name">Сет Стандарт</div><div class="dish-stats"><div class="dish-stat">Заказов<span>241</span></div><div class="dish-stat">Выручка<span>144 600 ₽</span></div></div></div>
+  <div class="dish-row"><div class="dish-name">Ролл Дракон</div><div class="dish-stats"><div class="dish-stat">Заказов<span>198</span></div><div class="dish-stat">Выручка<span>59 400 ₽</span></div></div></div>
+  <div class="dish-row"><div class="dish-name">Сет Премиум</div><div class="dish-stats"><div class="dish-stat">Заказов<span>156</span></div><div class="dish-stat">Выручка<span>124 800 ₽</span></div></div></div>
+</div>
+
+<div class="panel">
+  <div class="panel-title">Сравнение — Пропорция vs Мангал и мясо</div>
+  <div class="compare-grid">
+    <div class="compare-card">
+      <div class="compare-title">Пропорция</div>
+      <div class="compare-row"><div class="compare-label">Выручка</div><div class="compare-val">847 300 ₽</div></div>
+      <div class="compare-row"><div class="compare-label">Заказов</div><div class="compare-val">1 243</div></div>
+      <div class="compare-row"><div class="compare-label">Ср. чек</div><div class="compare-val">681 ₽</div></div>
+      <div class="compare-row"><div class="compare-label">ROAS</div><div class="compare-val green">4.2×</div></div>
+      <div class="compare-row"><div class="compare-label">CAC</div><div class="compare-val">312 ₽</div></div>
+    </div>
+    <div class="compare-card">
+      <div class="compare-title" style="color:#f39c12">Мангал и мясо</div>
+      <div class="compare-row"><div class="compare-label">Выручка</div><div class="compare-val">412 600 ₽</div></div>
+      <div class="compare-row"><div class="compare-label">Заказов</div><div class="compare-val">634</div></div>
+      <div class="compare-row"><div class="compare-label">Ср. чек</div><div class="compare-val">650 ₽</div></div>
+      <div class="compare-row"><div class="compare-label">ROAS</div><div class="compare-val amber">3.1×</div></div>
+      <div class="compare-row"><div class="compare-label">CAC</div><div class="compare-val">480 ₽</div></div>
+    </div>
   </div>
 </div>
 
@@ -181,69 +210,33 @@ body { font-family: Arial, sans-serif; background: #0f0f0f; color: #fff; padding
   <div class="save-val">~140 000 ₽/год</div>
 </div>
 
+<div style="text-align:center;color:#333;font-size:10px;margin-top:12px;">Axis v2.0</div>
+
 <script>
 const periodData = {
-  week:    { rev:'198 400 ₽', ord:'287',   cac:'298 ₽', roas:'4.5×', revD:'+8%',  ordD:'+5%', cacD:'-22 ₽', roasD:'+0.3' },
-  month:   { rev:'847 300 ₽', ord:'1 243', cac:'312 ₽', roas:'4.2×', revD:'+14%', ordD:'+9%', cacD:'-18 ₽', roasD:'+0.4' },
-  quarter: { rev:'2 340 000 ₽', ord:'3 810', cac:'328 ₽', roas:'3.8×', revD:'+22%', ordD:'+17%', cacD:'-45 ₽', roasD:'+0.7' }
+  week:    { rev:'198 400 ₽', ord:'287', check:'691 ₽', roas:'4.5×', cac:'298 ₽', ltv:'2 840 ₽', newc:'71%', spend:'44 200 ₽', revD:'+8%', ordD:'+5%', checkD:'+3%', roasD:'+0.3', cacD:'-22 ₽', ltvD:'+8%', newcD:'-1%', spendD:'+5%' },
+  month:   { rev:'847 300 ₽', ord:'1 243', check:'681 ₽', roas:'4.2×', cac:'312 ₽', ltv:'2 840 ₽', newc:'68%', spend:'201 500 ₽', revD:'+14%', ordD:'+9%', checkD:'+5%', roasD:'+0.4', cacD:'-18 ₽', ltvD:'+12%', newcD:'-2%', spendD:'+8%' },
+  quarter: { rev:'2 340 000 ₽', ord:'3 810', check:'614 ₽', roas:'3.8×', cac:'328 ₽', ltv:'2 840 ₽', newc:'72%', spend:'615 000 ₽', revD:'+22%', ordD:'+17%', checkD:'+9%', roasD:'+0.7', cacD:'-45 ₽', ltvD:'+18%', newcD:'+3%', spendD:'+12%' }
 };
-
 const companyData = {
-  proporcia: { rev:'847 300 ₽', ord:'1 243', cac:'312 ₽', roas:'4.2×', revD:'+14%', ordD:'+9%', cacD:'-18 ₽', roasD:'+0.4' },
-  mangal:    { rev:'412 600 ₽', ord:'634',   cac:'480 ₽', roas:'3.1×', revD:'+7%',  ordD:'+4%', cacD:'+22 ₽', roasD:'-0.2' }
+  proporcia: periodData.month,
+  mangal: { rev:'412 600 ₽', ord:'634', check:'650 ₽', roas:'3.1×', cac:'480 ₽', ltv:'1 920 ₽', newc:'74%', spend:'133 000 ₽', revD:'+7%', ordD:'+4%', checkD:'+2%', roasD:'-0.2', cacD:'+22 ₽', ltvD:'+5%', newcD:'+1%', spendD:'+11%' }
 };
-
 function setMetrics(d) {
-  document.getElementById('m-rev').textContent = d.rev;
-  document.getElementById('m-ord').textContent = d.ord;
-  document.getElementById('m-cac').textContent = d.cac;
-  document.getElementById('m-roas').textContent = d.roas;
-  document.getElementById('m-rev-d').textContent = d.revD + ' к прошлому';
-  document.getElementById('m-ord-d').textContent = d.ordD + ' к прошлому';
-  document.getElementById('m-cac-d').textContent = d.cacD + ' к прошлому';
-  document.getElementById('m-roas-d').textContent = d.roasD + ' к прошлому';
+  ['rev','ord','check','roas','cac','ltv','new','spend'].forEach(k => {
+    const el = document.getElementById('m-'+k);
+    const del = document.getElementById('m-'+k+'-d');
+    if(k==='new') { if(el) el.textContent = d.newc; if(del) del.textContent = d.newcD+' повторных'; }
+    else { if(el) el.textContent = d[k]; if(del) del.textContent = d[k+'D']; }
+  });
+  document.getElementById('roas-alert').className = 'alert'+(parseFloat(d.roas)<3?' show':'');
 }
-
-function setPeriod(p, btn) {
-  document.querySelectorAll('.pbtn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  setMetrics(periodData[p]);
-}
-
-function setCompany(c, btn) {
-  document.querySelectorAll('.sw-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  setMetrics(companyData[c]);
-}
-
-// Donut chart
-new Chart(document.getElementById('ch1'), {
-  type: 'doughnut',
-  data: {
-    labels: ['ВКонтакте','Блогеры','Telegram','Сайт'],
-    datasets: [{ data: [42,28,18,12], backgroundColor: ['#4a9eff','#9b59b6','#4caf50','#f39c12'], borderWidth: 0 }]
-  },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '68%' }
-});
-
-// Line chart
-const days = Array.from({length:30},(_,i)=>i+1+'');
-const vals = [18,22,19,28,31,25,27,24,33,38,29,35,42,39,28,31,44,48,36,41,52,47,38,44,55,49,42,51,58,53];
-new Chart(document.getElementById('ch2'), {
-  type: 'line',
-  data: {
-    labels: days,
-    datasets: [{ data: vals, borderColor: '#4a9eff', backgroundColor: 'rgba(74,158,255,0.08)', fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 }]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { display: false }, ticks: { maxTicksLimit: 8, color: '#555', font: { size: 11 } } },
-      y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#555', font: { size: 11 }, callback: v => Math.round(v/1000)+'к ₽' } }
-    }
-  }
-});
+function setPeriod(p,btn) { document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); setMetrics(periodData[p]); }
+function setCompany(c,btn) { document.querySelectorAll('.sw-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); setMetrics(companyData[c]); }
+new Chart(document.getElementById('ch1'),{type:'doughnut',data:{labels:['ВКонтакте','Блогеры','Telegram','Сайт'],datasets:[{data:[42,28,18,12],backgroundColor:['#4a9eff','#9b59b6','#4caf50','#f39c12'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'65%'}});
+const days=Array.from({length:30},(_,i)=>i+1+'');
+const vals=[18,22,19,28,31,25,27,24,33,38,29,35,42,39,28,31,44,48,36,41,52,47,38,44,55,49,42,51,58,53];
+new Chart(document.getElementById('ch2'),{type:'line',data:{labels:days,datasets:[{data:vals,borderColor:'#4a9eff',backgroundColor:'rgba(74,158,255,0.07)',fill:true,tension:0.4,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,color:'#444',font:{size:10}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#444',font:{size:10},callback:v=>Math.round(v/1000)+'к'}}}}});
 </script>
 </body>
 </html>
