@@ -331,19 +331,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
   <div class="topbar">
     <div class="page-title" id="page-title">Главная</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <div style="display:flex;gap:4px;background:var(--bg3);padding:3px;border-radius:8px;">
+        <button class="sw-btn active" id="top-sw-prop" onclick="setCompany('proporcia',this)">Пропорция</button>
+        <button class="sw-btn" id="top-sw-mang" onclick="setCompany('mangal',this)">Мангал</button>
+      </div>
       <div class="period-wrap">
         <button class="pbtn" onclick="setPeriod('w1',this)">1 нед</button>
         <button class="pbtn" onclick="setPeriod('w2',this)">2 нед</button>
         <button class="pbtn active" onclick="setPeriod('m1',this)">1 мес</button>
         <button class="pbtn" onclick="setPeriod('m3',this)">3 мес</button>
         <button class="cal-btn" id="cal-toggle-btn" onclick="toggleCal()">📅 Период</button>
-      </div>
-      <!-- Mobile company -->
-      <div style="display:none" id="mob-company">
-        <select onchange="setCompanyMob(this.value)" style="background:var(--bg2);border:1px solid var(--border2);color:var(--text);padding:5px 8px;border-radius:6px;font-size:11px;">
-          <option value="proporcia">Пропорция</option>
-          <option value="mangal">Мангал и мясо</option>
-        </select>
       </div>
     </div>
   </div>
@@ -411,21 +408,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         <div class="metric-val" id="m-rev">847 300 ₽</div>
         <div class="metric-delta green" id="m-rev-d">+14%</div>
         <div class="metric-forecast" id="m-forecast">Прогноз: 1 020 000 ₽</div>
+        <div style="font-size:10px;margin-top:4px;color:#4caf50;">🟢 Выше плана — хороший темп</div>
       </div>
       <div class="metric">
         <div class="metric-label">Заказов</div>
         <div class="metric-val" id="m-ord">1 243</div>
         <div class="metric-delta green" id="m-ord-d">+9%</div>
+        <div style="font-size:10px;margin-top:4px;color:#4caf50;">🟢 Рост стабильный</div>
       </div>
       <div class="metric">
         <div class="metric-label">Средний чек</div>
         <div class="metric-val" id="m-check">681 ₽</div>
         <div class="metric-delta green" id="m-check-d">+5%</div>
+        <div style="font-size:10px;margin-top:4px;color:#ffd27f;">🟡 Ниже цели 900 ₽ — работаем над увеличением</div>
       </div>
       <div class="metric">
         <div class="metric-label">ROAS</div>
         <div class="metric-val" id="m-roas">4.2×</div>
         <div class="metric-delta green" id="m-roas-d">+0.4</div>
+        <div style="font-size:10px;margin-top:4px;color:#4caf50;">🟢 Выше рынка 3.5× — хорошо</div>
       </div>
     </div>
     <div class="metrics">
@@ -433,21 +434,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         <div class="metric-label">CAC</div>
         <div class="metric-val" id="m-cac">312 ₽</div>
         <div class="metric-delta green" id="m-cac-d">-18 ₽</div>
+        <div style="font-size:10px;margin-top:4px;color:#4caf50;">🟢 Ниже рынка 350 ₽ — эффективно</div>
       </div>
       <div class="metric">
         <div class="metric-label">LTV клиента</div>
         <div class="metric-val" id="m-ltv">2 840 ₽</div>
         <div class="metric-delta green" id="m-ltv-d">+12%</div>
+        <div style="font-size:10px;margin-top:4px;color:#ffd27f;">🟡 Ниже цели 4 000 ₽ — потенциал роста есть</div>
       </div>
       <div class="metric">
         <div class="metric-label">Расходы реклама</div>
         <div class="metric-val" id="m-spend">201 500 ₽</div>
         <div class="metric-delta red" id="m-spend-d">+8%</div>
+        <div style="font-size:10px;margin-top:4px;color:#ffd27f;">🟡 Растут медленнее выручки +14% — окей</div>
       </div>
       <div class="metric">
         <div class="metric-label">Отмены</div>
         <div class="metric-val red" id="m-cancel">87</div>
         <div class="metric-delta red" id="m-cancel-d">7% заказов</div>
+        <div style="font-size:10px;margin-top:4px;color:#ff6b6b;">🔴 Выше нормы 5% — требует внимания</div>
       </div>
     </div>
 
@@ -556,29 +561,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
       <div style="position:relative;height:200px;"><canvas id="ch-channels"></canvas></div>
     </div>
     <div class="row3">
-      <div class="panel">
+      <div class="panel" style="border:1px solid #205a20;">
         <div class="panel-title">ВКонтакте</div>
         <div class="cycle-row"><div class="cycle-label">Потрачено</div><div class="cycle-val">42 000 ₽</div></div>
         <div class="cycle-row"><div class="cycle-label">Выручка</div><div class="cycle-val green">218 400 ₽</div></div>
         <div class="cycle-row"><div class="cycle-label">ROAS</div><div class="cycle-val green">5.2×</div></div>
         <div class="cycle-row"><div class="cycle-label">Заказов</div><div class="cycle-val">522</div></div>
         <div class="cycle-row"><div class="cycle-label">CAC</div><div class="cycle-val">80 ₽</div></div>
+        <div style="margin-top:10px;background:#1a2d1a;border-radius:6px;padding:8px 10px;font-size:11px;color:#7ed87e;line-height:1.5;">
+          🟢 <b>Лучший канал</b><br>
+          ROAS рекорд за 3 месяца. CAC 80 ₽ — минимальный по всем каналам. Рассмотрите увеличение бюджета на 20-30%.
+        </div>
       </div>
-      <div class="panel">
+      <div class="panel" style="border:1px solid #205a20;">
         <div class="panel-title">Блогеры</div>
         <div class="cycle-row"><div class="cycle-label">Потрачено</div><div class="cycle-val">33 100 ₽</div></div>
         <div class="cycle-row"><div class="cycle-label">Выручка</div><div class="cycle-val green">159 000 ₽</div></div>
         <div class="cycle-row"><div class="cycle-label">ROAS</div><div class="cycle-val green">4.8×</div></div>
         <div class="cycle-row"><div class="cycle-label">Заказов</div><div class="cycle-val">348</div></div>
         <div class="cycle-row"><div class="cycle-label">CAC</div><div class="cycle-val">95 ₽</div></div>
+        <div style="margin-top:10px;background:#1a2d1a;border-radius:6px;padding:8px 10px;font-size:11px;color:#7ed87e;line-height:1.5;">
+          🟢 <b>Хороший результат</b><br>
+          Второй по эффективности канал. Следите за динамикой каждого блогера — один уже теряет ROAS.
+        </div>
       </div>
-      <div class="panel">
+      <div class="panel" style="border:1px solid #5a2020;">
         <div class="panel-title">Яндекс.Директ</div>
         <div class="cycle-row"><div class="cycle-label">Потрачено</div><div class="cycle-val">27 800 ₽</div></div>
         <div class="cycle-row"><div class="cycle-label">Выручка</div><div class="cycle-val amber">78 000 ₽</div></div>
         <div class="cycle-row"><div class="cycle-label">ROAS</div><div class="cycle-val red">2.8×</div></div>
         <div class="cycle-row"><div class="cycle-label">Заказов</div><div class="cycle-val">114</div></div>
         <div class="cycle-row"><div class="cycle-label">CAC</div><div class="cycle-val red">244 ₽</div></div>
+        <div style="margin-top:10px;background:#2d1a1a;border-radius:6px;padding:8px 10px;font-size:11px;color:#ff6b6b;line-height:1.5;">
+          🔴 <b>Требует внимания</b><br>
+          ROAS 2.8× ниже порога 3× — канал не окупается. CAC 244 ₽ — в 2 раза выше чем ВКонтакте. Запросите объяснение у подрядчика.
+        </div>
       </div>
     </div>
   </div>
@@ -985,9 +1002,11 @@ function setPeriod(p, btn) {
 }
 function setCompany(c, btn) {
   document.querySelectorAll('.sw-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  if(btn) btn.classList.add('active');
+  // sync all switchers
+  const ids = c === 'proporcia' ? ['top-sw-prop'] : ['top-sw-mang'];
+  ids.forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('active'); });
 }
-function setCompanyMob(v) { setCompany(v, null); }
 
 // FUNNEL TABS
 function showFunnel(id, btn) {
