@@ -66,78 +66,57 @@ const IIKO_API = '/api/iiko';
 async function loadIikoData() {
   try {
     showLoadingState();
-    
-    // Load orders for last 30 days
-    const [ordersRes, cancelsRes] = await Promise.all([
-      fetch(IIKO_API + '?endpoint=orders&days=30'),
-      fetch(IIKO_API + '?endpoint=cancels&days=30')
-    ]);
 
-    const ordersData = await ordersRes.json();
-    const cancelsData = await cancelsRes.json();
+    // Load only 7 days orders first — fast
+    const res = await fetch(IIKO_API + '?endpoint=orders&days=7');
+    if (!res.ok) { showDemoState(); return; }
 
-    const orders = ordersData.ordersByOrganizations?.[0]?.orders || [];
-    const cancels = cancelsData.ordersByOrganizations?.[0]?.orders || [];
+    const data = await res.json();
+    const orders = data.ordersByOrganizations?.[0]?.orders || [];
 
-    if (orders.length === 0) {
-      showDemoState();
-      return;
-    }
+    if (orders.length === 0) { showDemoState(); return; }
 
-    // Calculate metrics from real data
+    // Calculate metrics
     const totalOrders = orders.length;
     const totalRevenue = orders.reduce((sum, o) => {
-      const items = o.order?.items || [];
-      return sum + items.reduce((s, i) => s + (i.sum || 0), 0);
+      return sum + (o.order?.items || []).reduce((s, i) => s + (i.sum || 0), 0);
     }, 0);
     const avgCheck = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-    const totalCancels = cancels.length;
-    const cancelRate = totalOrders > 0 ? Math.round(totalCancels / (totalOrders + totalCancels) * 100) : 0;
 
-    // Delivery time analysis
-    const deliveryTimes = orders
+    // Delivery times
+    const times = orders
       .filter(o => o.order?.whenCreated && o.order?.whenDelivered)
-      .map(o => {
-        const created = new Date(o.order.whenCreated);
-        const delivered = new Date(o.order.whenDelivered);
-        return Math.round((delivered - created) / 60000);
-      })
+      .map(o => Math.round((new Date(o.order.whenDelivered) - new Date(o.order.whenCreated)) / 60000))
       .filter(t => t > 0 && t < 300);
-    
-    const avgDelivery = deliveryTimes.length > 0
-      ? Math.round(deliveryTimes.reduce((a, b) => a + b, 0) / deliveryTimes.length)
-      : 0;
+    const avgDelivery = times.length > 0 ? Math.round(times.reduce((a,b)=>a+b,0)/times.length) : 0;
 
-    // Revenue by day for chart
-    const revenueByDay = {};
+    // Revenue by day
+    const byDay = {};
     orders.forEach(o => {
-      const date = o.order?.whenCreated?.slice(0, 10);
-      if (!date) return;
-      const sum = (o.order?.items || []).reduce((s, i) => s + (i.sum || 0), 0);
-      revenueByDay[date] = (revenueByDay[date] || 0) + sum;
+      const d = o.order?.whenCreated?.slice(0,10);
+      if (!d) return;
+      byDay[d] = (byDay[d]||0) + (o.order?.items||[]).reduce((s,i)=>s+(i.sum||0),0);
     });
 
-    // Update metrics on page
-    updateMetric('m-rev', formatMoney(totalRevenue));
+    // Update UI
     updateMetric('m-ord', totalOrders.toLocaleString('ru'));
-    updateMetric('m-check', formatMoney(avgCheck));
-    updateMetric('m-cancel', totalCancels);
-    updateMetric('m-cancel-d', cancelRate + '% заказов');
-    
-    // Update revenue chart with real data
-    updateRevenueChart(revenueByDay);
+    if (totalRevenue > 0) updateMetric('m-rev', formatMoney(totalRevenue));
+    if (avgCheck > 0) updateMetric('m-check', formatMoney(avgCheck));
+    updateRevenueChart(byDay);
+    showLiveBadge(totalOrders, avgDelivery);
 
-    // Update delivery time signal
-    if (avgDelivery > 0) {
-      const deliveryColor = avgDelivery > 60 ? '#f44336' : avgDelivery > 45 ? '#f39c12' : '#4caf50';
-      const deliveryEl = document.querySelector('.signal.red .signal-text');
-    }
-
-    // Show live data badge
-    showLiveBadge(orders.length, avgDelivery);
+    // Load cancels separately
+    fetch(IIKO_API + '?endpoint=cancels&days=7')
+      .then(r => r.json())
+      .then(d => {
+        const cancels = d.ordersByOrganizations?.[0]?.orders || [];
+        updateMetric('m-cancel', cancels.length);
+        const rate = totalOrders > 0 ? Math.round(cancels.length/(totalOrders+cancels.length)*100) : 0;
+        updateMetric('m-cancel-d', rate + '% заказов');
+      }).catch(()=>{});
 
   } catch(e) {
-    console.log('iiko load error:', e.message);
+    console.log('iiko error:', e);
     showDemoState();
   }
 }
