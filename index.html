@@ -69,7 +69,7 @@ async function loadIikoData() {
     showLoadingState();
 
     // Load only TODAY orders
-    const res = await fetch(IIKO_API + '?endpoint=orders&days=1');
+    const res = await fetch(IIKO_API + '?endpoint=orders&days=2');
     if (!res.ok) { showDemoState(); return; }
 
     const data = await res.json();
@@ -107,7 +107,7 @@ async function loadIikoData() {
     showLiveBadge(totalOrders, avgDelivery);
 
     // Load cancels separately
-    fetch(IIKO_API + '?endpoint=cancels&days=1')
+    fetch(IIKO_API + '?endpoint=cancels&days=2')
       .then(r => r.json())
       .then(d => {
         const cancels = d.ordersByOrganizations?.[0]?.orders || [];
