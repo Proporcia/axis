@@ -67,8 +67,8 @@ async function loadIikoData() {
   try {
     showLoadingState();
 
-    // Load only 7 days orders first — fast
-    const res = await fetch(IIKO_API + '?endpoint=orders&days=7');
+    // Load only TODAY orders
+    const res = await fetch(IIKO_API + '?endpoint=orders&days=1');
     if (!res.ok) { showDemoState(); return; }
 
     const data = await res.json();
@@ -106,7 +106,7 @@ async function loadIikoData() {
     showLiveBadge(totalOrders, avgDelivery);
 
     // Load cancels separately
-    fetch(IIKO_API + '?endpoint=cancels&days=7')
+    fetch(IIKO_API + '?endpoint=cancels&days=1')
       .then(r => r.json())
       .then(d => {
         const cancels = d.ordersByOrganizations?.[0]?.orders || [];
@@ -147,7 +147,7 @@ function showDemoState() {
 function showLiveBadge(count, avgTime) {
   const badge = document.getElementById('live-badge');
   if (badge) {
-    badge.textContent = `🟢 Живые данные iiko · ${count} заказов · доставка ~${avgTime} мин`;
+    badge.textContent = `🟢 Живые данные iiko · ${count} заказов сегодня · доставка ~${avgTime} мин`;
     badge.style.background = '#1a2d1a';
     badge.style.color = '#4caf50';
   }
@@ -684,9 +684,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
       <div class="dish-row"><div class="dish-name">Мисо суп</div><div class="dish-stats"><div class="dish-stat">Заказов<span>134</span></div><div class="dish-stat">Выручка<span>20 100 ₽</span></div></div></div>
     </div>
 
-    
-      <div class="save-val">~140 000 ₽/год</div>
-    </div>
+    <div class="save-val">~140 000 ₽/год</div>
 
   </div><!-- end main -->
 
@@ -953,7 +951,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
     </div>
   </div>
 
-
   <!-- ===== ИНСАЙТЫ ===== -->
   <div class="section" id="section-insights">
 
@@ -972,67 +969,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">ROAS</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;">4.2×</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">3.5×</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">6.0×</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#1a3d1a;color:#4caf50;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Выше рынка</span></td>
-          </tr>
-          <tr>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">CAC</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;">312 ₽</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">350 ₽</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">200 ₽</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#1a3d1a;color:#4caf50;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Выше рынка</span></td>
-          </tr>
-          <tr>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">Средний чек</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;">681 ₽</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">650 ₽</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">900 ₽</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#2d2a1a;color:#ffd27f;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Есть рост</span></td>
-          </tr>
-          <tr>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">Отмены</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;color:#f44336;">7%</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">5%</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">3%</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#2d1a1a;color:#ff6b6b;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Хуже рынка</span></td>
-          </tr>
-          <tr>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">Повторные заказы</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;">48%</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">40%</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">55%</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#1a3d1a;color:#4caf50;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Выше рынка</span></td>
-          </tr>
-          <tr>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">Время доставки</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;color:#f39c12;">52 мин</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">45 мин</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">35 мин</td>
-            <td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#2d1a1a;color:#ff6b6b;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Хуже рынка</span></td>
-          </tr>
-          <tr>
-            <td style="padding:9px 8px;color:var(--text2)">LTV клиента</td>
-            <td style="padding:9px 8px;text-align:center;font-weight:700;">2 840 ₽</td>
-            <td style="padding:9px 8px;text-align:center;color:var(--text3)">2 500 ₽</td>
-            <td style="padding:9px 8px;text-align:center;color:#4a9eff">4 000 ₽</td>
-            <td style="padding:9px 8px;text-align:center;"><span style="background:#2d2a1a;color:#ffd27f;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Есть рост</span></td>
-          </tr>
+          <tr><td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">ROAS</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;">4.2×</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">3.5×</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">6.0×</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#1a3d1a;color:#4caf50;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Выше рынка</span></td></tr>
+          <tr><td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">CAC</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;">312 ₽</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">350 ₽</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">200 ₽</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#1a3d1a;color:#4caf50;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Выше рынка</span></td></tr>
+          <tr><td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">Средний чек</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;">681 ₽</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">650 ₽</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">900 ₽</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#2d2a1a;color:#ffd27f;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Есть рост</span></td></tr>
+          <tr><td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">Отмены</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;color:#f44336;">7%</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">5%</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">3%</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#2d1a1a;color:#ff6b6b;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Хуже рынка</span></td></tr>
+          <tr><td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">Повторные заказы</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;">48%</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">40%</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">55%</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#1a3d1a;color:#4caf50;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Выше рынка</span></td></tr>
+          <tr><td style="padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)">Время доставки</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;color:#f39c12;">52 мин</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:var(--text3)">45 мин</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;color:#4a9eff">35 мин</td><td style="padding:9px 8px;border-bottom:1px solid var(--border);text-align:center;"><span style="background:#2d1a1a;color:#ff6b6b;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Хуже рынка</span></td></tr>
+          <tr><td style="padding:9px 8px;color:var(--text2)">LTV клиента</td><td style="padding:9px 8px;text-align:center;font-weight:700;">2 840 ₽</td><td style="padding:9px 8px;text-align:center;color:var(--text3)">2 500 ₽</td><td style="padding:9px 8px;text-align:center;color:#4a9eff">4 000 ₽</td><td style="padding:9px 8px;text-align:center;"><span style="background:#2d2a1a;color:#ffd27f;font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;">Есть рост</span></td></tr>
         </tbody>
       </table>
       </div>
     </div>
 
-    <!-- РЕКОМЕНДАЦИИ AI -->
+    <!-- РЕКОМЕНДАЦИИ -->
     <div class="panel">
       <div class="panel-title">Рекомендации на основе данных</div>
       <div id="insights-list">
         <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);">
           <div style="width:32px;height:32px;border-radius:8px;background:#2d1a1a;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;">🔴</div>
-          <div><div style="font-size:13px;font-weight:600;color:#ff6b6b;margin-bottom:3px;">Яндекс.Директ — ROAS 2.8×, нужно разобраться</div><div style="font-size:12px;color:var(--text3);line-height:1.6;">Показатель ниже порога окупаемости. Причин может быть несколько. Варианты действий:<br>· Запросить у подрядчика объяснение и план улучшений на 2 недели<br>· Если роста нет — рассмотреть смену стратегии или поиск нового специалиста<br>· Параллельно проверить аудитории и объявления — возможно дело в настройках</div></div>
+          <div><div style="font-size:13px;font-weight:600;color:#ff6b6b;margin-bottom:3px;">Яндекс.Директ — ROAS 2.8×, нужно разобраться</div><div style="font-size:12px;color:var(--text3);line-height:1.6;">Показатель ниже порога окупаемости. Варианты действий:<br>· Запросить у подрядчика объяснение и план улучшений на 2 недели<br>· Если роста нет — рассмотреть смену стратегии или поиск нового специалиста<br>· Параллельно проверить аудитории и объявления</div></div>
         </div>
         <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);">
           <div style="width:32px;height:32px;border-radius:8px;background:#2d1a1a;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;">🔴</div>
@@ -1040,7 +995,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         </div>
         <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);">
           <div style="width:32px;height:32px;border-radius:8px;background:#2d2a1a;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;">🟡</div>
-          <div><div style="font-size:13px;font-weight:600;color:#ffd27f;margin-bottom:3px;">Пересмотреть сотрудничество с @sushi_review</div><div style="font-size:12px;color:var(--text3);">ROAS упал с 3.8× до 2.1× за 3 месяца. Процент отмен 14% — самый высокий среди блогеров. Рекомендуем приостановить и переговорить об условиях.</div></div>
+          <div><div style="font-size:13px;font-weight:600;color:#ffd27f;margin-bottom:3px;">Пересмотреть сотрудничество с @sushi_review</div><div style="font-size:12px;color:var(--text3);">ROAS упал с 3.8× до 2.1× за 3 месяца. Процент отмен 14% — самый высокий. Рекомендуем приостановить и переговорить об условиях.</div></div>
         </div>
         <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);">
           <div style="width:32px;height:32px;border-radius:8px;background:#2d2a1a;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;">🟡</div>
@@ -1056,12 +1011,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         </div>
         <div style="display:flex;gap:12px;align-items:flex-start;padding:10px 0;">
           <div style="width:32px;height:32px;border-radius:8px;background:#1a2d1a;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px;">🟢</div>
-          <div><div style="font-size:13px;font-weight:600;color:#7ed87e;margin-bottom:3px;">Усилить пн-ср — слабые дни</div><div style="font-size:12px;color:var(--text3);line-height:1.6;">Не обязательно скидка — варианты на выбор:<br>· Рассылка в Сендлер утром пн-ср: "Сегодня быстрая доставка" — напоминание без потери маржи<br>· Анонс новинки или блюда дня — повод заказать<br>· Бесплатная доставка от 700 ₽ в будни — воспринимается лучше чем скидка на еду<br>· Ролл в подарок при заказе на 800+ ₽ в пн-ср<br>· Контент в соцсетях в понедельник — органический трафик без затрат</div></div>
+          <div><div style="font-size:13px;font-weight:600;color:#7ed87e;margin-bottom:3px;">Усилить пн-ср — слабые дни</div><div style="font-size:12px;color:var(--text3);line-height:1.6;">· Рассылка в Сендлер утром пн-ср: "Сегодня быстрая доставка"<br>· Анонс новинки или блюда дня<br>· Бесплатная доставка от 700 ₽ в будни<br>· Ролл в подарок при заказе на 800+ ₽ в пн-ср</div></div>
         </div>
       </div>
     </div>
 
-    <!-- КНОПКА ОТЧЁТ -->
+    <!-- AI ОТЧЁТ -->
     <div class="panel">
       <div class="panel-title">AI-отчёт за период</div>
       <p style="font-size:12px;color:var(--text3);margin-bottom:14px;">Нажми кнопку — система проанализирует все показатели и сформирует короткий отчёт с выводами и действиями на следующий период.</p>
@@ -1146,7 +1101,6 @@ function setPeriod(p, btn) {
 function setCompany(c, btn) {
   document.querySelectorAll('.sw-btn').forEach(b => b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  // sync all switchers
   const ids = c === 'proporcia' ? ['top-sw-prop'] : ['top-sw-mang'];
   ids.forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('active'); });
 }
@@ -1193,28 +1147,24 @@ tbl.innerHTML = th;
 // CHARTS
 const chartDefaults = { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} };
 
-// Revenue line
 new Chart(document.getElementById('ch-revenue'), {
   type:'line',
   data:{ labels:Array.from({length:30},(_,i)=>i+1+''), datasets:[{data:[18,22,19,28,31,25,27,24,33,38,29,35,42,39,28,31,44,48,36,41,52,47,38,44,55,49,42,51,58,53],borderColor:'#4a9eff',backgroundColor:'rgba(74,158,255,0.07)',fill:true,tension:0.4,pointRadius:0,borderWidth:2}]},
   options:{...chartDefaults, scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,color:'#666',font:{size:10}}},y:{grid:{color:'rgba(128,128,128,0.1)'},ticks:{color:'#666',font:{size:10},callback:v=>Math.round(v/1000)+'к'}}}}
 });
 
-// Donut
 new Chart(document.getElementById('ch-donut'), {
   type:'doughnut',
   data:{labels:['ВКонтакте','Блогеры','Telegram','Сайт'],datasets:[{data:[42,28,18,12],backgroundColor:['#4a9eff','#9b59b6','#4caf50','#f39c12'],borderWidth:0}]},
   options:{...chartDefaults, cutout:'65%'}
 });
 
-// Channels bar
 new Chart(document.getElementById('ch-channels'), {
   type:'bar',
   data:{labels:['ВКонтакте','Блогеры','Telegram','Директ'],datasets:[{label:'Расходы',data:[42,33,29,28],backgroundColor:'rgba(74,158,255,0.4)'},{label:'Выручка',data:[218,159,115,78],backgroundColor:['#4a9eff','#9b59b6','#4caf50','#e74c3c']}]},
   options:{...chartDefaults, plugins:{legend:{display:true,labels:{color:'#888',font:{size:10}}}}, scales:{x:{ticks:{color:'#666',font:{size:10}}},y:{ticks:{color:'#666',font:{size:10},callback:v=>v+'к'}}}}
 });
 
-// Bloggers trend
 new Chart(document.getElementById('ch-bloggers'), {
   type:'line',
   data:{labels:['Янв','Фев','Мар'],datasets:[
@@ -1226,7 +1176,6 @@ new Chart(document.getElementById('ch-bloggers'), {
   options:{...chartDefaults, plugins:{legend:{display:true,labels:{color:'#888',font:{size:10}}}}, scales:{x:{ticks:{color:'#666',font:{size:10}}},y:{ticks:{color:'#666',font:{size:10},callback:v=>v+'к'}}}}
 });
 
-// Clients
 new Chart(document.getElementById('ch-clients'), {
   type:'bar',
   data:{labels:['Янв','Фев','Мар'],datasets:[
@@ -1237,14 +1186,12 @@ new Chart(document.getElementById('ch-clients'), {
   options:{...chartDefaults, plugins:{legend:{display:true,labels:{color:'#888',font:{size:10}}}}, scales:{x:{stacked:false,ticks:{color:'#666',font:{size:10}}},y:{ticks:{color:'#666',font:{size:10}}}}}
 });
 
-// Promo
 new Chart(document.getElementById('ch-promo'), {
   type:'bar',
   data:{labels:['Обычный день','Скидка 15%','2+1 роллы','ДР скидка','Реактивация'],datasets:[{data:[41,89,74,55,67],backgroundColor:['#555','#4caf50','#4a9eff','#9b59b6','#f39c12']}]},
   options:{...chartDefaults, scales:{x:{ticks:{color:'#666',font:{size:10}}},y:{ticks:{color:'#666',font:{size:10}}}}}
 });
 
-// Compare
 new Chart(document.getElementById('ch-compare'), {
   type:'line',
   data:{labels:['Янв','Фев','Мар'],datasets:[
