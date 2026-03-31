@@ -3,19 +3,22 @@ import https from 'https';
 const API_LOGIN = 'e2361285036e43aba84ef879bf14c59c';
 const BASE_HOST = 'api-ru.iiko.services';
 
+// Organization IDs from iiko
+const ORGS = {
+  proporcia: 'd537096a-3641-4ea2-8733-c3a1c6088c0b',
+  callcenter: '52ac2837-3548-4520-92ca-6cfadce8e093'
+};
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Content-Type': 'application/json'
 };
 
-function request(method, path, body, token) {
+function apiRequest(method, path, body, token) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    };
+    const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (data) headers['Content-Length'] = Buffer.byteLength(data);
 
@@ -34,9 +37,13 @@ function request(method, path, body, token) {
 }
 
 async function getToken() {
-  const res = await request('POST', '/api/1/access_token', { apiLogin: API_LOGIN });
+  const res = await apiRequest('POST', '/api/1/access_token', { apiLogin: API_LOGIN });
   const json = JSON.parse(res.body);
   return json.token;
+}
+
+function daysAgo(n) {
+  return new Date(Date.now() - n * 86400000).toISOString().slice(0, 19) + '.000';
 }
 
 export default async (req) => {
@@ -44,49 +51,37 @@ export default async (req) => {
 
   const url = new URL(req.url);
   const endpoint = url.searchParams.get('endpoint') || 'organizations';
+  const days = parseInt(url.searchParams.get('days') || '7');
 
   try {
-    // Step 1: get access token
     const token = await getToken();
-
     let result;
 
     if (endpoint === 'organizations') {
-      // Get organizations list
-      result = await request('GET', '/api/1/organizations', null, token);
+      result = await apiRequest('GET', '/api/1/organizations', null, token);
 
     } else if (endpoint === 'orders') {
-      // Get delivery orders for last 7 days
-      const orgRes = await request('GET', '/api/1/organizations', null, token);
-      const orgs = JSON.parse(orgRes.body);
-      const orgIds = orgs.organizations?.map(o => o.id) || [];
-
-      const dateFrom = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19) + '.000';
-      const dateTo = new Date().toISOString().slice(0, 19) + '.000';
-
-      result = await request('POST', '/api/1/deliveries/by_delivery_date_and_status', {
-        organizationIds: orgIds,
-        deliveryDateFrom: dateFrom,
-        deliveryDateTo: dateTo,
-        statuses: ['Delivered', 'Closed']
+      // Get orders for one org, limited period
+      result = await apiRequest('POST', '/api/1/deliveries/by_delivery_date_and_status', {
+        organizationIds: [ORGS.proporcia],
+        deliveryDateFrom: daysAgo(days),
+        deliveryDateTo: daysAgo(0),
+        statuses: ['Delivered', 'Closed'],
+        maxResults: 100
       }, token);
 
     } else if (endpoint === 'revenue') {
-      // Get olap sales report
-      const orgRes = await request('GET', '/api/1/organizations', null, token);
-      const orgs = JSON.parse(orgRes.body);
-      const orgId = orgs.organizations?.[0]?.id;
-
-      const dateFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      // OLAP sales report for one org
+      const dateFrom = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
       const dateTo = new Date().toISOString().slice(0, 10);
 
-      result = await request('POST', '/api/1/reports/olap', {
-        organizationId: orgId,
+      result = await apiRequest('POST', '/api/1/reports/olap', {
+        organizationId: ORGS.proporcia,
         settings: {
           reportType: 'SALES',
           buildSummary: true,
           groupByRowFields: ['OpenDate.Typed'],
-          aggregateFields: ['DishSumInt', 'OrderNum', 'GuestNum'],
+          aggregateFields: ['DishSumInt', 'OrderNum'],
           filters: {
             'OpenDate.Typed': {
               filterType: 'DateRange',
@@ -99,18 +94,21 @@ export default async (req) => {
           }
         }
       }, token);
+
+    } else if (endpoint === 'cancels') {
+      result = await apiRequest('POST', '/api/1/deliveries/by_delivery_date_and_status', {
+        organizationIds: [ORGS.proporcia],
+        deliveryDateFrom: daysAgo(days),
+        deliveryDateTo: daysAgo(0),
+        statuses: ['Cancelled'],
+        maxResults: 100
+      }, token);
     }
 
-    return new Response(result?.body || '{}', {
-      status: result?.status || 200,
-      headers: CORS
-    });
+    return new Response(result?.body || '{}', { status: result?.status || 200, headers: CORS });
 
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
-      status: 500,
-      headers: CORS
-    });
+    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: CORS });
   }
 };
 
