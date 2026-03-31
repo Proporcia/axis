@@ -1,0 +1,7 @@
+[build]
+  publish = "."
+  
+[[redirects]]
+  from = "/api/iiko"
+  to = "/.netlify/functions/iiko"
+  status = 200
