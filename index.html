@@ -108,7 +108,7 @@ async function loadIikoData() {
     if (totalRevenue > 0) updateMetric('m-rev', formatMoney(totalRevenue));
     if (avgCheck > 0) updateMetric('m-check', formatMoney(avgCheck));
     showLiveBadge(totalOrders, avgDelivery);
-    updateRevenueChart(byDay);
+    try { updateRevenueChart(byDay); } catch(chartErr) { console.log('chart error:', chartErr); }
 
     // Load cancels separately
     fetch(IIKO_API + '?endpoint=cancels&days=2')
