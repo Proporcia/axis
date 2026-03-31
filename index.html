@@ -58,6 +58,165 @@ async function generateReport() {
   }
 }
 
+
+
+// ===== IIKO LIVE DATA =====
+const IIKO_API = '/api/iiko';
+
+async function loadIikoData() {
+  try {
+    showLoadingState();
+    
+    // Load orders for last 30 days
+    const [ordersRes, cancelsRes] = await Promise.all([
+      fetch(IIKO_API + '?endpoint=orders&days=30'),
+      fetch(IIKO_API + '?endpoint=cancels&days=30')
+    ]);
+
+    const ordersData = await ordersRes.json();
+    const cancelsData = await cancelsRes.json();
+
+    const orders = ordersData.ordersByOrganizations?.[0]?.orders || [];
+    const cancels = cancelsData.ordersByOrganizations?.[0]?.orders || [];
+
+    if (orders.length === 0) {
+      showDemoState();
+      return;
+    }
+
+    // Calculate metrics from real data
+    const totalOrders = orders.length;
+    const totalRevenue = orders.reduce((sum, o) => {
+      const items = o.order?.items || [];
+      return sum + items.reduce((s, i) => s + (i.sum || 0), 0);
+    }, 0);
+    const avgCheck = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+    const totalCancels = cancels.length;
+    const cancelRate = totalOrders > 0 ? Math.round(totalCancels / (totalOrders + totalCancels) * 100) : 0;
+
+    // Delivery time analysis
+    const deliveryTimes = orders
+      .filter(o => o.order?.whenCreated && o.order?.whenDelivered)
+      .map(o => {
+        const created = new Date(o.order.whenCreated);
+        const delivered = new Date(o.order.whenDelivered);
+        return Math.round((delivered - created) / 60000);
+      })
+      .filter(t => t > 0 && t < 300);
+    
+    const avgDelivery = deliveryTimes.length > 0
+      ? Math.round(deliveryTimes.reduce((a, b) => a + b, 0) / deliveryTimes.length)
+      : 0;
+
+    // Revenue by day for chart
+    const revenueByDay = {};
+    orders.forEach(o => {
+      const date = o.order?.whenCreated?.slice(0, 10);
+      if (!date) return;
+      const sum = (o.order?.items || []).reduce((s, i) => s + (i.sum || 0), 0);
+      revenueByDay[date] = (revenueByDay[date] || 0) + sum;
+    });
+
+    // Update metrics on page
+    updateMetric('m-rev', formatMoney(totalRevenue));
+    updateMetric('m-ord', totalOrders.toLocaleString('ru'));
+    updateMetric('m-check', formatMoney(avgCheck));
+    updateMetric('m-cancel', totalCancels);
+    updateMetric('m-cancel-d', cancelRate + '% заказов');
+    
+    // Update revenue chart with real data
+    updateRevenueChart(revenueByDay);
+
+    // Update delivery time signal
+    if (avgDelivery > 0) {
+      const deliveryColor = avgDelivery > 60 ? '#f44336' : avgDelivery > 45 ? '#f39c12' : '#4caf50';
+      const deliveryEl = document.querySelector('.signal.red .signal-text');
+    }
+
+    // Show live data badge
+    showLiveBadge(orders.length, avgDelivery);
+
+  } catch(e) {
+    console.log('iiko load error:', e.message);
+    showDemoState();
+  }
+}
+
+function formatMoney(n) {
+  return Math.round(n).toLocaleString('ru') + ' ₽';
+}
+
+function updateMetric(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function showLoadingState() {
+  const badge = document.getElementById('live-badge');
+  if (badge) badge.textContent = '⏳ Загружаем данные iiko...';
+}
+
+function showDemoState() {
+  const badge = document.getElementById('live-badge');
+  if (badge) {
+    badge.textContent = '📊 Демо-данные';
+    badge.style.background = '#2d2a1a';
+    badge.style.color = '#ffd27f';
+  }
+}
+
+function showLiveBadge(count, avgTime) {
+  const badge = document.getElementById('live-badge');
+  if (badge) {
+    badge.textContent = `🟢 Живые данные iiko · ${count} заказов · доставка ~${avgTime} мин`;
+    badge.style.background = '#1a2d1a';
+    badge.style.color = '#4caf50';
+  }
+}
+
+let revenueChart = null;
+
+function updateRevenueChart(revenueByDay) {
+  const sorted = Object.entries(revenueByDay).sort((a, b) => a[0].localeCompare(b[0]));
+  if (sorted.length === 0) return;
+
+  const labels = sorted.map(([d]) => d.slice(5)); // MM-DD
+  const values = sorted.map(([, v]) => Math.round(v / 1000)); // в тысячах
+
+  const canvas = document.getElementById('ch-revenue');
+  if (!canvas) return;
+
+  if (revenueChart) revenueChart.destroy();
+  
+  revenueChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderColor: '#4a9eff',
+        backgroundColor: 'rgba(74,158,255,0.07)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 2,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 10, color: '#666', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(128,128,128,0.1)' }, ticks: { color: '#666', font: { size: 10 }, callback: v => v + 'к' } }
+      }
+    }
+  });
+}
+
+// Load on start
+window.addEventListener('load', loadIikoData);
+
 </script>
 <style>
 :root[data-theme="dark"] {
@@ -362,6 +521,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 
   <!-- ===== ГЛАВНАЯ ===== -->
   <div class="section active" id="section-main">
+
+    <!-- LIVE DATA BADGE -->
+    <div id="live-badge" style="background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:8px 14px;font-size:12px;color:#555;margin-bottom:12px;text-align:center;">
+      ⏳ Подключаемся к iiko...
+    </div>
 
     <!-- СИГНАЛЫ -->
     <div class="signals">
