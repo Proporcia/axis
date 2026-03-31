@@ -107,8 +107,8 @@ async function loadIikoData() {
     updateMetric('m-ord', totalOrders.toLocaleString('ru'));
     if (totalRevenue > 0) updateMetric('m-rev', formatMoney(totalRevenue));
     if (avgCheck > 0) updateMetric('m-check', formatMoney(avgCheck));
-    updateRevenueChart(byDay);
     showLiveBadge(totalOrders, avgDelivery);
+    updateRevenueChart(byDay);
 
     // Load cancels separately
     fetch(IIKO_API + '?endpoint=cancels&days=2')
