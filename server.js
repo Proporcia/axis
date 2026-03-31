@@ -2,24 +2,34 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const url = require('url');
+const path = require('path');
 
 const PORT = 3000;
 const IIKO_API_LOGIN = 'e2361285036e43aba84ef879bf14c59c';
 const IIKO_BASE = 'api-ru.iiko.services';
 const ORG_ID = 'd537096a-3641-4ea2-8733-c3a1c6088c0b';
+const ROOT = '/root/axis';
 
-function httpsPost(host, path, body, token) {
+const MIME = {
+  '.html': 'text/html',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+};
+
+function httpsPost(host, p, body, token) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const opts = {
-      hostname: host, port: 443, path, method: 'POST',
+      hostname: host, port: 443, path: p, method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data),
         ...(token ? { 'Authorization': 'Bearer ' + token } : {}) }
     };
     const req = https.request(opts, res => {
       let d = '';
       res.on('data', c => d += c);
-      res.on('end', () => resolve(JSON.parse(d)));
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
     });
     req.on('error', reject);
     req.write(data);
@@ -65,13 +75,21 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: e.message }));
     }
   } else {
-    const file = q.pathname === '/' ? '/root/axis/index.html' : '/root/axis' + q.pathname;
-    fs.readFile(file, (err, data) => {
+    const filePath = q.pathname === '/' ? path.join(ROOT, 'index.html') : path.join(ROOT, q.pathname);
+    const ext = path.extname(filePath);
+    const mime = MIME[ext] || 'text/plain';
+    fs.readFile(filePath, (err, data) => {
       if (err) { res.writeHead(404); res.end('Not found'); return; }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.writeHead(200, { 'Content-Type': mime });
       res.end(data);
     });
   }
 });
 
-server.listen(PORT, () => console.log('Axis running on port ' + PORT));
+server.listen(PORT, '0.0.0.0', () => console.log('Axis running on port ' + PORT));
+```
+
+Сделай commit, потом в консоли:
+```
+curl -L -o server.js https://raw.githubusercontent.com/Proporcia/axis/main/server.js
+pm2 restart server
