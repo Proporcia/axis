@@ -77,10 +77,14 @@ async function loadIikoData() {
 
     if (orders.length === 0) { showDemoState(); return; }
 
+    // Debug
+    console.log('orders count:', orders.length);
+
     // Calculate metrics
     const totalOrders = orders.length;
     const totalRevenue = orders.reduce((sum, o) => {
-      return sum + (o.order?.items || []).reduce((s, i) => s + (i.sum || 0), 0);
+      const pay = (o.order?.payments || []).find(p => !p.isPreliminary);
+      return sum + (pay?.sum || 0);
     }, 0);
     const avgCheck = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
 
@@ -96,7 +100,7 @@ async function loadIikoData() {
     orders.forEach(o => {
       const d = o.order?.whenCreated?.slice(0,10);
       if (!d) return;
-      byDay[d] = (byDay[d]||0) + (o.order?.items||[]).reduce((s,i)=>s+(i.sum||0),0);
+      const p = (o.order?.payments||[]).find(p=>!p.isPreliminary); byDay[d] = (byDay[d]||0) + (p?.sum||0);
     });
 
     // Update UI
