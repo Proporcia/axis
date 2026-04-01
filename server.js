@@ -18,13 +18,19 @@ const MIME = {
   '.png': 'image/png',
 };
 
+let cachedToken = null;
+let tokenExpiry = 0;
+
 function httpsPost(host, p, body, token) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const opts = {
       hostname: host, port: 443, path: p, method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data),
-        ...(token ? { 'Authorization': 'Bearer ' + token } : {}) }
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data),
+        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+      }
     };
     const req = https.request(opts, res => {
       let d = '';
@@ -38,8 +44,16 @@ function httpsPost(host, p, body, token) {
 }
 
 async function getToken() {
+  const now = Date.now();
+  if (cachedToken && now < tokenExpiry) return cachedToken;
   const r = await httpsPost(IIKO_BASE, '/api/1/access_token', { apiLogin: IIKO_API_LOGIN });
-  return r.token;
+  cachedToken = r.token;
+  tokenExpiry = now + 55 * 60 * 1000;
+  return cachedToken;
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function daysAgo(n) {
@@ -47,27 +61,50 @@ function daysAgo(n) {
   return d.toISOString().slice(0, 10) + ' 00:00:00.000';
 }
 
+function todayEnd() {
+  return todayStr() + ' 23:59:59.000';
+}
+
 const server = http.createServer(async (req, res) => {
-  const cors = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+  const cors = {
+    'Access-Control-Allow-Origin': '*',
+    'Content-Type': 'application/json'
+  };
+
   const q = url.parse(req.url, true);
 
   if (q.pathname === '/api/iiko') {
     try {
       const endpoint = q.query.endpoint;
-      const days = parseInt(q.query.days) || 2;
+      const days = parseInt(q.query.days) || 1;
       const token = await getToken();
       let result;
+
+      const dateFrom = days === 1
+        ? todayStr() + ' 00:00:00.000'
+        : daysAgo(days);
+      const dateTo = todayEnd();
+
       if (endpoint === 'orders') {
-        result = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status',
-          { organizationIds: [ORG_ID], deliveryDateFrom: daysAgo(days), deliveryDateTo: daysAgo(0),
-            statuses: ['Delivered', 'Closed'], maxResults: 500 }, token);
+        result = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
+          organizationIds: [ORG_ID],
+          deliveryDateFrom: dateFrom,
+          deliveryDateTo: dateTo,
+          statuses: ['Delivered', 'Closed'],
+          maxResults: 500
+        }, token);
       } else if (endpoint === 'cancels') {
-        result = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status',
-          { organizationIds: [ORG_ID], deliveryDateFrom: daysAgo(days), deliveryDateTo: daysAgo(0),
-            statuses: ['Cancelled'], maxResults: 500 }, token);
+        result = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
+          organizationIds: [ORG_ID],
+          deliveryDateFrom: dateFrom,
+          deliveryDateTo: dateTo,
+          statuses: ['Cancelled'],
+          maxResults: 500
+        }, token);
       } else if (endpoint === 'organizations') {
         result = await httpsPost(IIKO_BASE, '/api/1/organizations', { organizationIds: [] }, token);
       }
+
       res.writeHead(200, cors);
       res.end(JSON.stringify(result));
     } catch(e) {
@@ -87,9 +124,3 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => console.log('Axis running on port ' + PORT));
-```
-
-Сделай commit, потом в консоли:
-```
-curl -L -o server.js https://raw.githubusercontent.com/Proporcia/axis/main/server.js
-pm2 restart server
