@@ -10,6 +10,9 @@ const IIKO_BASE = 'api-ru.iiko.services';
 const ORG_ID = 'd537096a-3641-4ea2-8733-c3a1c6088c0b';
 const ROOT = '/root/axis';
 
+const METRIKA_TOKEN = 'y0__xCHidczGJG5GCDG9_f4FjDarqHXCNxN10L5_MUdkEgfmF9W_r5Ejzqq';
+const METRIKA_COUNTER = '106964124';
+
 const MIME = {
   '.html': 'text/html',
   '.js': 'application/javascript',
@@ -20,6 +23,19 @@ const MIME = {
 
 let cachedToken = null;
 let tokenExpiry = 0;
+
+function httpsGet(host, p, headers) {
+  return new Promise((resolve, reject) => {
+    const opts = { hostname: host, port: 443, path: p, method: 'GET', headers: headers || {} };
+    const req = https.request(opts, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
 
 function httpsPost(host, p, body, token) {
   return new Promise((resolve, reject) => {
@@ -65,12 +81,13 @@ function todayEnd() {
   return todayStr() + ' 23:59:59.000';
 }
 
-const server = http.createServer(async (req, res) => {
-  const cors = {
-    'Access-Control-Allow-Origin': '*',
-    'Content-Type': 'application/json'
-  };
+function dateNDaysAgo(n) {
+  const d = new Date(Date.now() - n * 86400000);
+  return d.toISOString().slice(0, 10);
+}
 
+const server = http.createServer(async (req, res) => {
+  const cors = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
   const q = url.parse(req.url, true);
 
   if (q.pathname === '/api/iiko') {
@@ -79,30 +96,49 @@ const server = http.createServer(async (req, res) => {
       const days = parseInt(q.query.days) || 1;
       const token = await getToken();
       let result;
-
-      const dateFrom = days === 1
-        ? todayStr() + ' 00:00:00.000'
-        : daysAgo(days);
+      const dateFrom = days === 1 ? todayStr() + ' 00:00:00.000' : daysAgo(days);
       const dateTo = todayEnd();
 
       if (endpoint === 'orders') {
         result = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
-          organizationIds: [ORG_ID],
-          deliveryDateFrom: dateFrom,
-          deliveryDateTo: dateTo,
-          statuses: ['Delivered', 'Closed'],
-          maxResults: 500
+          organizationIds: [ORG_ID], deliveryDateFrom: dateFrom, deliveryDateTo: dateTo,
+          statuses: ['Delivered', 'Closed'], maxResults: 500
         }, token);
       } else if (endpoint === 'cancels') {
         result = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
-          organizationIds: [ORG_ID],
-          deliveryDateFrom: dateFrom,
-          deliveryDateTo: dateTo,
-          statuses: ['Cancelled'],
-          maxResults: 500
+          organizationIds: [ORG_ID], deliveryDateFrom: dateFrom, deliveryDateTo: dateTo,
+          statuses: ['Cancelled'], maxResults: 500
         }, token);
       } else if (endpoint === 'organizations') {
         result = await httpsPost(IIKO_BASE, '/api/1/organizations', { organizationIds: [] }, token);
+      }
+      res.writeHead(200, cors);
+      res.end(JSON.stringify(result));
+    } catch(e) {
+      res.writeHead(500, cors);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+
+  } else if (q.pathname === '/api/metrika') {
+    try {
+      const days = parseInt(q.query.days) || 1;
+      const date1 = days === 1 ? 'today' : dateNDaysAgo(days);
+      const date2 = 'today';
+      const type = q.query.type || 'sources';
+      let result;
+
+      if (type === 'sources') {
+        // Traffic sources
+        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:goal1reaches&dimensions=ym:s:lastTrafficSource&date1=${date1}&date2=${date2}&limit=20`;
+        result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
+      } else if (type === 'utm') {
+        // UTM campaigns
+        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits&dimensions=ym:s:UTMSource,ym:s:UTMCampaign&date1=${date1}&date2=${date2}&limit=50`;
+        result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
+      } else if (type === 'summary') {
+        // Summary visits
+        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:users,ym:s:bounceRate,ym:s:avgVisitDurationSeconds&date1=${date1}&date2=${date2}`;
+        result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       }
 
       res.writeHead(200, cors);
@@ -111,6 +147,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, cors);
       res.end(JSON.stringify({ error: e.message }));
     }
+
   } else {
     const filePath = q.pathname === '/' ? path.join(ROOT, 'index.html') : path.join(ROOT, q.pathname);
     const ext = path.extname(filePath);
