@@ -335,6 +335,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
   </div>
   <div class="nav-item" onclick="showSection('today',this)"><span class="nav-icon">⚡</span>Сегодня</div>
   <div class="nav-item active" onclick="showSection('main',this)"><span class="nav-icon">📊</span>Главная</div>
+  <div class="nav-item" onclick="showSection('traffic',this)"><span class="nav-icon">📈</span>Трафик</div>
   <div class="nav-item" onclick="showSection('cancels',this)"><span class="nav-icon">❌</span>Отмены</div>
   <div class="sidebar-bottom">
     <button class="theme-btn" onclick="toggleTheme()">🌙 Сменить тему</button>
@@ -346,6 +347,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
   <div class="mob-nav">
     <div class="mob-nav-item" onclick="showSection('today',this)">⚡ Сегодня</div>
     <div class="mob-nav-item active" onclick="showSection('main',this)">📊 Главная</div>
+    <div class="mob-nav-item" onclick="showSection('traffic',this)">📈 Трафик</div>
     <div class="mob-nav-item" onclick="showSection('cancels',this)">❌ Отмены</div>
   </div>
 
@@ -470,6 +472,57 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
     </div>
   </div>
 
+
+  <!-- ТРАФИК -->
+  <div class="section" id="section-traffic">
+    <div id="traffic-badge" class="badge">⏳ Загружаем данные Метрики...</div>
+    
+    <!-- Сводка -->
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Визитов на сайт</div>
+        <div class="metric-val" id="t-visits">—</div>
+        <div class="metric-delta" id="t-visits-d"></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Уникальных пользователей</div>
+        <div class="metric-val" id="t-users">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Конверсия сайт→заказ</div>
+        <div class="metric-val green" id="t-conv">—</div>
+        <div class="metric-delta" style="color:var(--text3);font-size:10px">визиты / заказы iiko</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Среднее время на сайте</div>
+        <div class="metric-val" id="t-duration">—</div>
+      </div>
+    </div>
+
+    <!-- Источники -->
+    <div class="panel">
+      <div class="panel-title">Источники трафика</div>
+      <div id="t-sources"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div>
+    </div>
+
+    <!-- UTM кампании -->
+    <div class="panel">
+      <div class="panel-title">UTM-кампании</div>
+      <div id="t-utm"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div>
+    </div>
+
+    <!-- Отказы -->
+    <div class="panel">
+      <div class="panel-title">Показатель отказов</div>
+      <div style="display:flex;align-items:center;gap:16px;padding:10px 0;">
+        <div style="font-size:32px;font-weight:700;" id="t-bounce">—</div>
+        <div style="font-size:12px;color:var(--text3);line-height:1.6">
+          Процент людей которые<br>зашли и сразу ушли.<br>Норма для доставки еды: до 30%
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ОТМЕНЫ -->
   <div class="section" id="section-cancels">
     <div id="cancel-badge" class="badge">⏳ Загружаем отмены...</div>
@@ -509,7 +562,7 @@ function toggleTheme() {
   document.querySelector('.theme-btn').textContent = t === 'dark' ? '🌙 Сменить тему' : '☀️ Сменить тему';
 }
 
-const pageTitles = { today:'Сегодня', main:'Главная', cancels:'Отмены' };
+const pageTitles = { today:'Сегодня', main:'Главная', traffic:'Трафик', cancels:'Отмены' };
 
 function showSection(id, el) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -522,6 +575,7 @@ function showSection(id, el) {
   document.getElementById('cal-popup').classList.remove('show');
 
   if (id === 'cancels') loadCancelsSection();
+  if (id === 'traffic') loadTrafficData();
 }
 
 function setPeriod(p, btn) {
@@ -556,6 +610,113 @@ document.addEventListener('click', function(e) {
   const btn = document.getElementById('cal-toggle-btn');
   if (!popup.contains(e.target) && e.target !== btn) popup.classList.remove('show');
 });
+
+
+// ===== ТРАФИК — МЕТРИКА =====
+async function loadTrafficData(days) {
+  days = days || currentDays;
+  setBadge('traffic-badge', '⏳ Загружаем данные Метрики...', '#555', '#1a1a1a');
+  try {
+    // Get orders count for conversion
+    const ordRes = await fetch('/api/iiko?endpoint=orders&days=' + days);
+    const ordData = await ordRes.json();
+    const ordersCount = ordData.ordersByOrganizations?.[0]?.orders?.length || 0;
+
+    // Summary
+    const sumRes = await fetch('/api/metrika?type=summary&days=' + days);
+    const sumData = await sumRes.json();
+    const visits = sumData.data?.[0]?.metrics?.[0] || 0;
+    const users = sumData.data?.[0]?.metrics?.[1] || 0;
+    const bounce = sumData.data?.[0]?.metrics?.[2] || 0;
+    const duration = sumData.data?.[0]?.metrics?.[3] || 0;
+
+    const conv = visits > 0 ? ((ordersCount / visits) * 100).toFixed(1) : 0;
+    const durMin = Math.floor(duration / 60);
+    const durSec = Math.round(duration % 60);
+
+    updateEl('t-visits', Math.round(visits).toLocaleString('ru'));
+    updateEl('t-users', Math.round(users).toLocaleString('ru'));
+    updateEl('t-conv', conv + '%');
+    updateEl('t-duration', durMin + ':' + String(durSec).padStart(2,'0'));
+    updateEl('t-bounce', bounce.toFixed(1) + '%');
+
+    setBadge('traffic-badge',
+      '🟢 Метрика · ' + Math.round(visits) + ' визитов · ' + ordersCount + ' заказов · конверсия ' + conv + '%',
+      '#4caf50', '#1a2d1a'
+    );
+
+    // Sources
+    const srcRes = await fetch('/api/metrika?type=sources&days=' + days);
+    const srcData = await srcRes.json();
+    const sources = srcData.data || [];
+    const maxVisits = Math.max(...sources.map(s => s.metrics?.[0] || 0), 1);
+
+    const sourceNames = {
+      'organic': '🔍 Органический поиск',
+      'referral': '🔗 Переходы по ссылкам',
+      'social': '📱 Соцсети',
+      'direct': '🏠 Прямые заходы',
+      'ad': '📢 Реклама',
+      'internal': '↩️ Внутренние переходы',
+      'email': '📧 Email',
+      'messenger': '💬 Мессенджеры',
+      'undefined': '❓ Не определён',
+    };
+
+    const srcEl = document.getElementById('t-sources');
+    if (srcEl && sources.length > 0) {
+      srcEl.innerHTML = sources.map(s => {
+        const name = s.dimensions?.[0]?.name || s.dimensions?.[0]?.id || '—';
+        const v = Math.round(s.metrics?.[0] || 0);
+        const pct = Math.round((v / maxVisits) * 100);
+        const label = sourceNames[name] || name;
+        const share = visits > 0 ? Math.round((v/visits)*100) : 0;
+        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
+          <div style="min-width:180px;color:var(--text2)">${label}</div>
+          <div style="flex:1;background:var(--bg3);border-radius:3px;height:6px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:#4a9eff;border-radius:3px"></div>
+          </div>
+          <div style="min-width:50px;text-align:right;font-weight:700">${v.toLocaleString('ru')}</div>
+          <div style="min-width:35px;text-align:right;color:var(--text3)">${share}%</div>
+        </div>`;
+      }).join('');
+    } else if (srcEl) {
+      srcEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">Нет данных</div>';
+    }
+
+    // UTM campaigns
+    const utmRes = await fetch('/api/metrika?type=utm&days=' + days);
+    const utmData = await utmRes.json();
+    const utms = utmData.data || [];
+
+    const utmEl = document.getElementById('t-utm');
+    if (utmEl) {
+      if (utms.length === 0) {
+        utmEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">UTM-меток не найдено за период</div>';
+      } else {
+        const maxU = Math.max(...utms.map(u => u.metrics?.[0] || 0), 1);
+        utmEl.innerHTML = utms.slice(0,15).map(u => {
+          const src = u.dimensions?.[0]?.name || '—';
+          const camp = u.dimensions?.[1]?.name || '—';
+          const v = Math.round(u.metrics?.[0] || 0);
+          const pct = Math.round((v / maxU) * 100);
+          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
+            <div style="min-width:80px;color:#4a9eff;font-size:10px">${src}</div>
+            <div style="flex:1;color:var(--text2)">${camp}</div>
+            <div style="width:80px;background:var(--bg3);border-radius:3px;height:5px;overflow:hidden">
+              <div style="width:${pct}%;height:100%;background:#9b59b6;border-radius:3px"></div>
+            </div>
+            <div style="min-width:40px;text-align:right;font-weight:700">${v}</div>
+          </div>`;
+        }).join('');
+      }
+    }
+
+  } catch(e) {
+    console.log('traffic error:', e);
+    setBadge('traffic-badge', '❌ Ошибка загрузки Метрики', '#ff6b6b', '#2d1a1a');
+  }
+}
 
 // Cancels section
 async function loadCancelsSection() {
