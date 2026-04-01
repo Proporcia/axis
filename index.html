@@ -199,7 +199,132 @@ function updateRevenueChart(revenueByDay) {
 }
 
 // Load on start
-window.addEventListener('load', loadIikoData);
+
+// ===== СЕГОДНЯ — ЖИВЫЕ ДАННЫЕ =====
+let todayChart = null;
+let todayCountdown = 300;
+let todayTimer = null;
+
+async function loadTodayData() {
+  try {
+    const res = await fetch('/api/iiko?endpoint=orders&days=1');
+    if (!res.ok) return;
+    const data = await res.json();
+    const orders = data.ordersByOrganizations?.[0]?.orders || [];
+
+    if (orders.length === 0) {
+      const b = document.getElementById('today-badge');
+      if (b) b.textContent = '📭 Заказов сегодня ещё нет';
+      return;
+    }
+
+    const totalOrders = orders.length;
+    const totalRevenue = orders.reduce((sum, o) => {
+      const pay = (o.order?.payments||[]).find(p=>!p.isPreliminary);
+      return sum + (pay?.sum||0);
+    }, 0);
+    const avgCheck = totalOrders > 0 ? Math.round(totalRevenue/totalOrders) : 0;
+
+    const times = orders
+      .filter(o => o.order?.whenCreated && o.order?.whenDelivered)
+      .map(o => Math.round((new Date(o.order.whenDelivered) - new Date(o.order.whenCreated))/60000))
+      .filter(t => t > 0 && t < 300);
+    const avgDelivery = times.length > 0 ? Math.round(times.reduce((a,b)=>a+b,0)/times.length) : 0;
+
+    const sums = orders.map(o => {
+      const pay = (o.order?.payments||[]).find(p=>!p.isPreliminary);
+      return pay?.sum||0;
+    }).filter(s=>s>0);
+    const maxOrder = sums.length > 0 ? Math.max(...sums) : 0;
+    const minOrder = sums.length > 0 ? Math.min(...sums) : 0;
+
+    const byHour = {};
+    orders.forEach(o => {
+      const h = o.order?.whenCreated?.slice(11,13);
+      if (h) byHour[h] = (byHour[h]||0) + 1;
+    });
+
+    document.getElementById('today-ord').textContent = totalOrders;
+    document.getElementById('today-rev').textContent = formatMoney(totalRevenue);
+    document.getElementById('today-check').textContent = formatMoney(avgCheck);
+    document.getElementById('today-delivery').textContent = avgDelivery > 0 ? avgDelivery + ' мин' : '—';
+    document.getElementById('today-max').textContent = formatMoney(maxOrder);
+    document.getElementById('today-min').textContent = formatMoney(minOrder);
+
+    const now = new Date();
+    const upd = document.getElementById('today-updated');
+    if (upd) upd.textContent = 'Обновлено: ' + now.toLocaleTimeString('ru');
+
+    const badge = document.getElementById('today-badge');
+    if (badge) {
+      badge.textContent = '🟢 Живые данные · ' + totalOrders + ' заказов сегодня';
+      badge.style.background = '#1a2d1a';
+      badge.style.color = '#4caf50';
+    }
+
+    const canvas = document.getElementById('ch-today-hours');
+    if (canvas) {
+      if (todayChart) todayChart.destroy();
+      const hours = Array.from({length:24},(_,i)=>String(i).padStart(2,'0'));
+      const hourData = hours.map(h => byHour[h]||0);
+      todayChart = new Chart(canvas, {
+        type:'bar',
+        data:{labels:hours, datasets:[{data:hourData, backgroundColor:'rgba(74,158,255,0.6)', borderRadius:3}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+          scales:{x:{grid:{display:false},ticks:{color:'#666',font:{size:10}}},
+            y:{grid:{color:'rgba(128,128,128,0.1)'},ticks:{color:'#666',font:{size:10},stepSize:1}}}}
+      });
+    }
+
+    const list = document.getElementById('today-orders-list');
+    if (list) {
+      const recent = [...orders].sort((a,b) => new Date(b.order?.whenCreated) - new Date(a.order?.whenCreated)).slice(0,10);
+      list.innerHTML = recent.map(o => {
+        const pay = (o.order?.payments||[]).find(p=>!p.isPreliminary);
+        const sum = pay?.sum||0;
+        const time = o.order?.whenCreated?.slice(11,16)||'';
+        const name = o.order?.customer?.name||'—';
+        const status = o.order?.status||'';
+        return `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);align-items:center;gap:8px;">
+          <span style="color:var(--text3);min-width:40px">${time}</span>
+          <span style="color:var(--text2);flex:1">${name}</span>
+          <span style="font-weight:700">${formatMoney(sum)}</span>
+          <span style="font-size:10px;color:${status==='Closed'?'#4caf50':'#f39c12'}">${status==='Closed'?'✓':'⏳'}</span>
+        </div>`;
+      }).join('');
+    }
+
+    fetch('/api/iiko?endpoint=cancels&days=1').then(r=>r.json()).then(d => {
+      const cancels = d.ordersByOrganizations?.[0]?.orders || [];
+      const el = document.getElementById('today-cancel');
+      const eld = document.getElementById('today-cancel-d');
+      if (el) el.textContent = cancels.length;
+      const rate = totalOrders > 0 ? Math.round(cancels.length/(totalOrders+cancels.length)*100) : 0;
+      if (eld) eld.textContent = rate + '% от заказов';
+    }).catch(()=>{});
+
+  } catch(e) {
+    console.log('today error:', e);
+  }
+}
+
+function startTodayCountdown() {
+  todayCountdown = 300;
+  if (todayTimer) clearInterval(todayTimer);
+  todayTimer = setInterval(() => {
+    todayCountdown--;
+    const m = Math.floor(todayCountdown/60);
+    const s = todayCountdown%60;
+    const el = document.getElementById('today-countdown');
+    if (el) el.textContent = m + ':' + String(s).padStart(2,'0');
+    if (todayCountdown <= 0) {
+      loadTodayData();
+      todayCountdown = 300;
+    }
+  }, 1000);
+}
+
+window.addEventListener('load', () => { loadIikoData(1); loadTodayData(); startTodayCountdown(); });
 
 </script>
 <style>
