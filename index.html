@@ -481,9 +481,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         <button class="sw-btn" id="top-sw-mang" onclick="setCompany('mangal',this)">Мангал</button>
       </div>
       <div class="period-wrap">
+        <button class="pbtn active" onclick="setPeriod('d1',this)">Сегодня</button>
         <button class="pbtn" onclick="setPeriod('w1',this)">1 нед</button>
         <button class="pbtn" onclick="setPeriod('w2',this)">2 нед</button>
-        <button class="pbtn active" onclick="setPeriod('m1',this)">1 мес</button>
+        <button class="pbtn" onclick="setPeriod('m1',this)">1 мес</button>
         <button class="pbtn" onclick="setPeriod('m3',this)">3 мес</button>
         <button class="cal-btn" id="cal-toggle-btn" onclick="toggleCal()">📅 Период</button>
       </div>
@@ -1163,7 +1164,7 @@ function setPeriod(p, btn) {
   btn.classList.add('active');
   document.getElementById('cal-toggle-btn').classList.remove('active');
   document.getElementById('cal-toggle-btn').textContent = '📅 Период';
-  const daysMap = {w1:7, w2:14, m1:30, m3:90};
+  const daysMap = {d1:1, w1:7, w2:14, m1:30, m3:90};
   loadIikoData(daysMap[p]);
 }
 function setCompany(c, btn) {
