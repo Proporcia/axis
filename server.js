@@ -10,7 +10,7 @@ const IIKO_BASE = 'api-ru.iiko.services';
 const ORG_ID = 'd537096a-3641-4ea2-8733-c3a1c6088c0b';
 const ROOT = '/root/axis';
 
-const METRIKA_TOKEN = 'y0__xCHidczGMXjPyDdgfz4FjDarqHXCG_L7xb0MbOzK7nTrg_E6U31UdC7';
+const METRIKA_TOKEN = 'y0__xCHidczGJG5GCDG9_f4FjDarqHXCNxN10L5_MUdkEgfmF9W_r5Ejzqq';
 const METRIKA_COUNTER = '106964124';
 
 const MIME = {
@@ -128,13 +128,16 @@ const server = http.createServer(async (req, res) => {
       let result;
 
       if (type === 'sources') {
-        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits&dimensions=ym:s:lastTrafficSource&date1=${date1}&date2=${date2}&limit=20`;
+        // ecommerce: визиты, покупки, выручка по источникам
+        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastTrafficSource&date1=${date1}&date2=${date2}&limit=20`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       } else if (type === 'utm') {
+        // UTM campaigns
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits&dimensions=ym:s:UTMSource,ym:s:UTMCampaign&date1=${date1}&date2=${date2}&limit=50`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       } else if (type === 'summary') {
-        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:users,ym:s:bounceRate,ym:s:avgVisitDurationSeconds&date1=${date1}&date2=${date2}`;
+        // Summary visits
+        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:users,ym:s:bounceRate,ym:s:avgVisitDurationSeconds,ym:s:pageDepth,ym:s:newUsers&date1=${date1}&date2=${date2}`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       }
 
