@@ -690,35 +690,36 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         <div class="metric-delta" id="t-visits-d"></div>
       </div>
       <div class="metric">
-        <div class="metric-label">Покупок (Метрика)</div>
+        <div class="metric-label">Покупок (ecom)</div>
         <div class="metric-val green" id="t-goals">—</div>
-        <div class="metric-delta">цель: /orderSuccess</div>
+        <div class="metric-delta" id="t-goals-d">данные Метрики</div>
       </div>
       <div class="metric">
         <div class="metric-label">Конверсия</div>
         <div class="metric-val" id="t-conv">—</div>
-        <div class="metric-delta">визиты → покупка</div>
+        <div class="metric-delta" id="t-conv-hint">визиты → покупка</div>
       </div>
       <div class="metric">
         <div class="metric-label">Выручка (ecom)</div>
         <div class="metric-val" id="t-est-rev">—</div>
-        <div class="metric-delta">данные Метрики</div>
+        <div class="metric-delta" id="t-rev-hint">данные Метрики</div>
       </div>
     </div>
     <div class="metrics">
       <div class="metric">
         <div class="metric-label">Время на сайте</div>
         <div class="metric-val" id="t-duration">—</div>
+        <div class="metric-delta" id="t-duration-hint">норма: 2-4 мин</div>
       </div>
       <div class="metric">
         <div class="metric-label">Отказы</div>
         <div class="metric-val" id="t-bounce">—</div>
-        <div class="metric-delta">норма: до 30%</div>
+        <div class="metric-delta" id="t-bounce-hint">норма: до 30%</div>
       </div>
       <div class="metric">
         <div class="metric-label">Глубина просмотра</div>
         <div class="metric-val" id="t-depth">—</div>
-        <div class="metric-delta">страниц за визит</div>
+        <div class="metric-delta" id="t-depth-hint">норма: 3+ страниц</div>
       </div>
       <div class="metric">
         <div class="metric-label">Новых посетителей</div>
@@ -726,8 +727,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         <div class="metric-delta" id="t-new-pct"></div>
       </div>
     </div>
-
-    <div class="panel">
+        <div class="panel">
       <div class="panel-title">Источники трафика</div>
       <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">Визиты · Покупки · Конверсия · ~Выручка</div>
       <div id="t-sources"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div>
@@ -834,16 +834,26 @@ async function loadTrafficData(days) {
   days = days || currentDays;
   setBadge('traffic-badge', '⏳ Загружаем данные Метрики...', '#555', '#1a1a1a');
 
-  const SRC = {
-    'organic':   { icon:'🔍', name:'Органический поиск',  hint:'Яндекс, Google, 2ГИС — без рекламы' },
-    'ad':        { icon:'📢', name:'Платная реклама',      hint:'Яндекс.Директ и другие рекламные системы' },
-    'social':    { icon:'📱', name:'Соцсети',              hint:'ВКонтакте, Instagram, Telegram и др.' },
-    'direct':    { icon:'🏠', name:'Прямые заходы',        hint:'Набрали адрес сами или открыли из закладок' },
-    'referral':  { icon:'🔗', name:'Переходы по ссылкам',  hint:'Сторонние сайты, агрегаторы' },
-    'messenger': { icon:'💬', name:'Мессенджеры',          hint:'Telegram, WhatsApp — ссылки из чатов' },
-    'email':     { icon:'📧', name:'Email / рассылки',     hint:'Переходы из писем' },
-    'internal':  { icon:'↩️', name:'Внутренние переходы',  hint:'Переходы внутри сайта' },
-    'undefined': { icon:'❓', name:'Не определён',         hint:'Источник не удалось определить' },
+  // Словарь детальных источников
+  const SRC_DETAIL = {
+    'yandex_search':  { icon:'🔍', name:'Яндекс — поиск',       hint:'Органическая выдача Яндекса' },
+    'google_search':  { icon:'🔍', name:'Google — поиск',        hint:'Органическая выдача Google' },
+    '2gis':           { icon:'🗺️', name:'2ГИС',                  hint:'Переходы из 2ГИС' },
+    'yandex_maps':    { icon:'🗺️', name:'Яндекс.Карты',          hint:'Переходы из Яндекс.Карт' },
+    'yandex_direct':  { icon:'📢', name:'Яндекс.Директ',         hint:'Платная реклама Яндекс' },
+    'vkontakte':      { icon:'📱', name:'ВКонтакте',              hint:'Переходы из ВКонтакте' },
+    'telegram':       { icon:'✈️', name:'Telegram',               hint:'Переходы из Telegram' },
+    '':               { icon:'🏠', name:'Прямые заходы',          hint:'Набрали адрес сами или из закладок' },
+  };
+  const SRC_TYPE = {
+    'organic': { icon:'🔍', name:'Органический поиск', hint:'Яндекс, Google и др. без рекламы' },
+    'ad':      { icon:'📢', name:'Платная реклама',    hint:'Яндекс.Директ и другие системы' },
+    'social':  { icon:'📱', name:'Соцсети',            hint:'ВКонтакте, Instagram, Telegram' },
+    'direct':  { icon:'🏠', name:'Прямые заходы',      hint:'Набрали адрес сами или из закладок' },
+    'referral':{ icon:'🔗', name:'Ссылки с сайтов',   hint:'Агрегаторы, сторонние сайты' },
+    'messenger':{ icon:'💬', name:'Мессенджеры',       hint:'Ссылки из чатов' },
+    'email':   { icon:'📧', name:'Email',              hint:'Переходы из писем' },
+    'undefined':{ icon:'❓', name:'Не определён',      hint:'Источник не удалось определить' },
   };
   const UTM_SRC = {
     'yandex':'📢 Яндекс.Директ','vk':'📱 ВКонтакте','vkontakte':'📱 ВКонтакте',
@@ -851,93 +861,152 @@ async function loadTrafficData(days) {
     'blogger':'🎬 Блогер','2gis':'🗺️ 2ГИС','google':'🔍 Google',
   };
 
+  function badge(val, good, ok, label) {
+    if (val >= good) return `<span style="color:#2ecc71">✅ Отлично (норма: ${label})</span>`;
+    if (val >= ok)   return `<span style="color:#f39c12">⚡ Норма (цель: ${label})</span>`;
+    return `<span style="color:#e74c3c">⚠️ Нужно улучшить (норма: ${label})</span>`;
+  }
+  function badgeLow(val, bad, ok, label) {
+    if (val <= bad) return `<span style="color:#2ecc71">✅ Отлично (норма: ${label})</span>`;
+    if (val <= ok)  return `<span style="color:#f39c12">⚡ Норма (до ${label})</span>`;
+    return `<span style="color:#e74c3c">⚠️ Высокий (норма: до ${label})</span>`;
+  }
+
   try {
     const [ordRes, sumRes, srcRes, utmRes] = await Promise.all([
       fetch('/api/iiko?endpoint=orders&days=' + days),
       fetch('/api/metrika?type=summary&days=' + days),
-      fetch('/api/metrika?type=sources&days=' + days),
+      fetch('/api/metrika?type=sources-detail&days=' + days),
       fetch('/api/metrika?type=utm&days=' + days),
     ]);
 
     const orders = (await ordRes.json()).ordersByOrganizations?.[0]?.orders || [];
-    const ordersCount = orders.length;
     const totalRev = orders.reduce((s,o) => {
       const p = (o.order?.payments||[]).find(p=>!p.isPreliminary);
       return s + (p?.sum||0);
     }, 0);
-    const avgCheck = ordersCount > 0 ? totalRev / ordersCount : 0;
+    const avgCheck = orders.length > 0 ? totalRev / orders.length : 0;
 
-    const sumMetrics = (await sumRes.json()).data?.[0]?.metrics || [];
-    const visits   = sumMetrics[0] || 0;
-    const users    = sumMetrics[1] || 0;
-    const bounce   = sumMetrics[2] || 0;
-    const duration = sumMetrics[3] || 0;
-    const depth    = sumMetrics[4] || 0;
-    const newUsers = sumMetrics[5] || 0;
+    const sumM = (await sumRes.json()).data?.[0]?.metrics || [];
+    const visits   = sumM[0] || 0;
+    const users    = sumM[1] || 0;
+    const bounce   = sumM[2] || 0;
+    const duration = sumM[3] || 0;
+    const depth    = sumM[4] || 0;
+    const newUsers = sumM[5] || 0;
 
-    const sources = (await srcRes.json()).data || [];
-    const totalGoals = sources.reduce((s,r) => s + (r.metrics?.[1]||0), 0);  // покупки из ecommerce
-    const totalMetrikaRev = sources.reduce((s,r) => s + (r.metrics?.[2]||0), 0); // выручка из Метрики
-    const conv = visits > 0 ? ((totalGoals/visits)*100).toFixed(1) : '0.0';
-    const estRev = totalMetrikaRev > 0 ? totalMetrikaRev : (totalGoals * avgCheck);
+    const srcRows = (await srcRes.json()).data || [];
+    const totalGoals  = srcRows.reduce((s,r) => s + (r.metrics?.[1]||0), 0);
+    const totalMetRev = srcRows.reduce((s,r) => s + (r.metrics?.[2]||0), 0);
+    const conv = visits > 0 ? ((totalGoals/visits)*100) : 0;
+    const convStr = conv.toFixed(1);
     const durMin = Math.floor(duration/60);
     const durSec = Math.round(duration%60);
     const newPct = users > 0 ? Math.round((newUsers/users)*100) : 0;
 
+    // Карточки
     updateEl('t-visits', Math.round(visits).toLocaleString('ru'));
     updateEl('t-visits-d', 'уникальных: ' + Math.round(users).toLocaleString('ru'));
     updateEl('t-goals', Math.round(totalGoals).toLocaleString('ru'));
-    updateEl('t-conv', conv + '%');
-    updateEl('t-est-rev', estRev > 0 ? formatMoney(Math.round(estRev)) : '—');
+    updateEl('t-goals-d', totalGoals > 0 ? 'ecommerce Метрика' : 'нет данных ecom');
+    updateEl('t-conv', convStr + '%');
+    updateEl('t-est-rev', totalMetRev > 0 ? formatMoney(Math.round(totalMetRev)) : (totalGoals > 0 && avgCheck > 0 ? formatMoney(Math.round(totalGoals*avgCheck)) : '—'));
     updateEl('t-duration', durMin + ':' + String(durSec).padStart(2,'0'));
     updateEl('t-bounce', bounce.toFixed(1) + '%');
     updateEl('t-depth', depth.toFixed(1));
     updateEl('t-new', Math.round(newUsers).toLocaleString('ru'));
-    updateEl('t-new-pct', newPct + '% от посетителей');
+    updateEl('t-new-pct', newPct + '% от посетителей · ' + (newPct > 70 ? '⚠️ Мало повторных' : newPct > 50 ? '⚡ Норма' : '✅ Хорошее удержание'));
+
+    // Умные пояснения
+    const convEl = document.getElementById('t-conv-hint');
+    if (convEl) convEl.innerHTML = conv >= 8 ? '<span style="color:#2ecc71">✅ Отлично (норма: 3-5%)</span>'
+      : conv >= 4 ? '<span style="color:#2ecc71">✅ Хорошо (норма: 3-5%)</span>'
+      : conv >= 2 ? '<span style="color:#f39c12">⚡ Норма (цель: 5%+)</span>'
+      : '<span style="color:#e74c3c">⚠️ Нужно улучшить (норма: 3-5%)</span>';
+
+    const durEl = document.getElementById('t-duration-hint');
+    if (durEl) durEl.innerHTML = duration >= 180 ? '<span style="color:#2ecc71">✅ Хорошо (норма: 2-4 мин)</span>'
+      : duration >= 90 ? '<span style="color:#f39c12">⚡ Норма (цель: 3+ мин)</span>'
+      : '<span style="color:#e74c3c">⚠️ Мало (норма: 2-4 мин)</span>';
+
+    const bounceEl = document.getElementById('t-bounce-hint');
+    if (bounceEl) bounceEl.innerHTML = bounce <= 15 ? '<span style="color:#2ecc71">✅ Отлично (норма: до 30%)</span>'
+      : bounce <= 30 ? '<span style="color:#2ecc71">✅ Норма (до 30%)</span>'
+      : bounce <= 50 ? '<span style="color:#f39c12">⚡ Выше нормы (норма: до 30%)</span>'
+      : '<span style="color:#e74c3c">⚠️ Высокий (норма: до 30%)</span>';
+
+    const depthEl = document.getElementById('t-depth-hint');
+    if (depthEl) depthEl.innerHTML = depth >= 5 ? '<span style="color:#2ecc71">✅ Отлично (норма: 3+)</span>'
+      : depth >= 3 ? '<span style="color:#2ecc71">✅ Норма (3+ страниц)</span>'
+      : depth >= 2 ? '<span style="color:#f39c12">⚡ Норма (цель: 3+)</span>'
+      : '<span style="color:#e74c3c">⚠️ Мало (норма: 3+ страниц)</span>';
+
+    const revEl = document.getElementById('t-rev-hint');
+    if (revEl) revEl.innerHTML = totalMetRev > 0
+      ? '<span style="color:#2ecc71">из Метрики ecommerce</span>'
+      : '<span style="color:var(--text3)">расчётная: покупки × ср.чек</span>';
 
     setBadge('traffic-badge',
-      '🟢 Метрика · ' + Math.round(visits).toLocaleString('ru') + ' визитов · ' + Math.round(totalGoals) + ' покупок · конверсия ' + conv + '%',
+      '🟢 Метрика · ' + Math.round(visits).toLocaleString('ru') + ' визитов · ' + Math.round(totalGoals) + ' покупок · конверсия ' + convStr + '%',
       '#4caf50', '#1a2d1a'
     );
 
-    // Таблица источников
-    const maxV = Math.max(...sources.map(s=>s.metrics?.[0]||0), 1);
+    // Таблица детальных источников
     const srcEl = document.getElementById('t-sources');
     if (srcEl) {
-      srcEl.innerHTML = sources.length === 0
-        ? '<div style="color:var(--text3);font-size:12px;padding:10px 0">Нет данных</div>'
-        : sources.map(s => {
-            const key  = s.dimensions?.[0]?.id || s.dimensions?.[0]?.name || 'undefined';
-            const info = SRC[key] || {icon:'🌐', name:key, hint:''};
-            const v    = Math.round(s.metrics?.[0]||0);
-            const g    = Math.round(s.metrics?.[1]||0);
-            const metrikaRev = s.metrics?.[2] || 0;
-            const cv   = v > 0 ? ((g/v)*100).toFixed(1) : '0.0';
-            // Используем выручку из Метрики ecommerce если есть, иначе расчётную
-            const rev  = metrikaRev > 0 ? formatMoney(Math.round(metrikaRev)) : (g > 0 && avgCheck > 0 ? formatMoney(Math.round(g*avgCheck)) : '—');
-            const bar  = Math.round((v/maxV)*100);
-            const share = visits > 0 ? Math.round((v/visits)*100) : 0;
-            return `<div style="padding:10px 0;border-bottom:1px solid var(--border);">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                <span style="font-size:16px">${info.icon}</span>
-                <div style="flex:1">
-                  <div style="font-size:13px;font-weight:600;color:var(--text)">${info.name}</div>
-                  <div style="font-size:10px;color:var(--text3)">${info.hint}</div>
-                </div>
-                <div style="text-align:right">
-                  <div style="font-size:14px;font-weight:700">${v.toLocaleString('ru')} <span style="font-size:10px;color:var(--text3)">${share}%</span></div>
-                </div>
+      if (srcRows.length === 0) {
+        srcEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">Нет данных</div>';
+      } else {
+        const maxV = Math.max(...srcRows.map(s=>s.metrics?.[0]||0), 1);
+        srcEl.innerHTML = srcRows.map(s => {
+          const searchId = s.dimensions?.[0]?.id || '';
+          const typeId   = s.dimensions?.[1]?.id || s.dimensions?.[1]?.name || 'undefined';
+          const searchName = s.dimensions?.[0]?.name || '';
+
+          // Определяем иконку и название
+          let icon, name, hint;
+          if (SRC_DETAIL[searchId]) {
+            ({ icon, name, hint } = SRC_DETAIL[searchId]);
+          } else if (searchName && searchId) {
+            const t = SRC_TYPE[typeId] || {icon:'🌐', name:typeId, hint:''};
+            icon = t.icon;
+            name = searchName.replace(', search results','').replace(' traffic','');
+            hint = t.hint;
+          } else {
+            const t = SRC_TYPE[typeId] || {icon:'🌐', name:typeId, hint:''};
+            ({ icon, name, hint } = t);
+          }
+
+          const v   = Math.round(s.metrics?.[0]||0);
+          const g   = Math.round(s.metrics?.[1]||0);
+          const rev = s.metrics?.[2]||0;
+          const cv  = v > 0 ? ((g/v)*100).toFixed(1) : '0.0';
+          const revStr = rev > 0 ? formatMoney(Math.round(rev)) : (g > 0 && avgCheck > 0 ? '~'+formatMoney(Math.round(g*avgCheck)) : '—');
+          const bar  = Math.round((v/maxV)*100);
+          const share = visits > 0 ? Math.round((v/visits)*100) : 0;
+
+          return `<div style="padding:10px 0;border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span style="font-size:16px">${icon}</span>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:600;color:var(--text)">${name}</div>
+                <div style="font-size:10px;color:var(--text3)">${hint}</div>
               </div>
-              <div style="background:var(--bg3);border-radius:3px;height:4px;margin-bottom:8px;">
-                <div style="width:${bar}%;height:100%;background:#4a9eff;border-radius:3px;"></div>
+              <div style="text-align:right">
+                <div style="font-size:14px;font-weight:700">${v.toLocaleString('ru')} <span style="font-size:10px;color:var(--text3)">${share}%</span></div>
               </div>
-              <div style="display:flex;gap:16px;font-size:11px;">
-                <span style="color:var(--text3)">Покупок: <b style="color:#2ecc71">${g}</b></span>
-                <span style="color:var(--text3)">Конверсия: <b style="color:var(--text)">${cv}%</b></span>
-                <span style="color:var(--text3)">Выручка: <b style="color:var(--text)">${rev}</b></span>
-              </div>
-            </div>`;
-          }).join('');
+            </div>
+            <div style="background:var(--bg3);border-radius:3px;height:4px;margin-bottom:8px;">
+              <div style="width:${bar}%;height:100%;background:#4a9eff;border-radius:3px;"></div>
+            </div>
+            <div style="display:flex;gap:16px;font-size:11px;">
+              <span style="color:var(--text3)">Покупок: <b style="color:#2ecc71">${g}</b></span>
+              <span style="color:var(--text3)">Конверсия: <b style="color:var(--text)">${cv}%</b></span>
+              <span style="color:var(--text3)">Выручка: <b style="color:var(--text)">${revStr}</b></span>
+            </div>
+          </div>`;
+        }).join('');
+      }
     }
 
     // UTM кампании
@@ -949,16 +1018,20 @@ async function loadTrafficData(days) {
       } else {
         const maxU = Math.max(...utms.map(u=>u.metrics?.[0]||0), 1);
         utmEl.innerHTML = utms.slice(0,20).map(u => {
-          const srcKey   = (u.dimensions?.[0]?.name||'').toLowerCase();
-          const camp     = u.dimensions?.[1]?.name || 'без названия';
+          const srcKey  = (u.dimensions?.[0]?.name||'').toLowerCase();
+          const medium  = u.dimensions?.[1]?.name || '';
+          const camp    = u.dimensions?.[2]?.name || 'без названия';
           const srcLabel = UTM_SRC[srcKey] || ('🔗 ' + (u.dimensions?.[0]?.name||'—'));
           const v   = Math.round(u.metrics?.[0]||0);
+          const g   = Math.round(u.metrics?.[1]||0);
+          const rev = u.metrics?.[2]||0;
           const bar = Math.round((v/maxU)*100);
           return `<div style="padding:8px 0;border-bottom:1px solid var(--border);">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
               <span style="font-size:11px;color:#4a9eff;min-width:130px">${srcLabel}</span>
-              <span style="font-size:12px;color:var(--text2);flex:1">${camp}</span>
+              <span style="font-size:12px;color:var(--text2);flex:1">${camp}${medium ? ' · '+medium : ''}</span>
               <span style="font-size:13px;font-weight:700">${v}</span>
+              ${g > 0 ? `<span style="font-size:11px;color:#2ecc71;min-width:50px;text-align:right">${g} покуп.</span>` : ''}
             </div>
             <div style="background:var(--bg3);border-radius:3px;height:3px;">
               <div style="width:${bar}%;height:100%;background:#9b59b6;border-radius:3px;"></div>
