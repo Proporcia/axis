@@ -700,9 +700,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         <div class="metric-delta">визиты → покупка</div>
       </div>
       <div class="metric">
-        <div class="metric-label">~Выручка</div>
+        <div class="metric-label">Выручка (ecom)</div>
         <div class="metric-val" id="t-est-rev">—</div>
-        <div class="metric-delta">покупки × ср.чек</div>
+        <div class="metric-delta">данные Метрики</div>
       </div>
     </div>
     <div class="metrics">
@@ -876,9 +876,10 @@ async function loadTrafficData(days) {
     const newUsers = sumMetrics[5] || 0;
 
     const sources = (await srcRes.json()).data || [];
-    const totalGoals = sources.reduce((s,r) => s + (r.metrics?.[1]||0), 0);
+    const totalGoals = sources.reduce((s,r) => s + (r.metrics?.[1]||0), 0);  // покупки из ecommerce
+    const totalMetrikaRev = sources.reduce((s,r) => s + (r.metrics?.[2]||0), 0); // выручка из Метрики
     const conv = visits > 0 ? ((totalGoals/visits)*100).toFixed(1) : '0.0';
-    const estRev = totalGoals * avgCheck;
+    const estRev = totalMetrikaRev > 0 ? totalMetrikaRev : (totalGoals * avgCheck);
     const durMin = Math.floor(duration/60);
     const durSec = Math.round(duration%60);
     const newPct = users > 0 ? Math.round((newUsers/users)*100) : 0;
@@ -887,7 +888,7 @@ async function loadTrafficData(days) {
     updateEl('t-visits-d', 'уникальных: ' + Math.round(users).toLocaleString('ru'));
     updateEl('t-goals', Math.round(totalGoals).toLocaleString('ru'));
     updateEl('t-conv', conv + '%');
-    updateEl('t-est-rev', avgCheck > 0 ? formatMoney(Math.round(estRev)) : '—');
+    updateEl('t-est-rev', estRev > 0 ? formatMoney(Math.round(estRev)) : '—');
     updateEl('t-duration', durMin + ':' + String(durSec).padStart(2,'0'));
     updateEl('t-bounce', bounce.toFixed(1) + '%');
     updateEl('t-depth', depth.toFixed(1));
@@ -910,8 +911,10 @@ async function loadTrafficData(days) {
             const info = SRC[key] || {icon:'🌐', name:key, hint:''};
             const v    = Math.round(s.metrics?.[0]||0);
             const g    = Math.round(s.metrics?.[1]||0);
+            const metrikaRev = s.metrics?.[2] || 0;
             const cv   = v > 0 ? ((g/v)*100).toFixed(1) : '0.0';
-            const rev  = avgCheck > 0 ? formatMoney(Math.round(g*avgCheck)) : '—';
+            // Используем выручку из Метрики ecommerce если есть, иначе расчётную
+            const rev  = metrikaRev > 0 ? formatMoney(Math.round(metrikaRev)) : (g > 0 && avgCheck > 0 ? formatMoney(Math.round(g*avgCheck)) : '—');
             const bar  = Math.round((v/maxV)*100);
             const share = visits > 0 ? Math.round((v/visits)*100) : 0;
             return `<div style="padding:10px 0;border-bottom:1px solid var(--border);">
@@ -931,7 +934,7 @@ async function loadTrafficData(days) {
               <div style="display:flex;gap:16px;font-size:11px;">
                 <span style="color:var(--text3)">Покупок: <b style="color:#2ecc71">${g}</b></span>
                 <span style="color:var(--text3)">Конверсия: <b style="color:var(--text)">${cv}%</b></span>
-                <span style="color:var(--text3)">~Выручка: <b style="color:var(--text)">${rev}</b></span>
+                <span style="color:var(--text3)">Выручка: <b style="color:var(--text)">${rev}</b></span>
               </div>
             </div>`;
           }).join('');
