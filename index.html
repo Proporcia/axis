@@ -884,16 +884,40 @@ async function loadTrafficData(days) {
     const srcRows = (await srcRes.json()).data || [];
     // Добавляем рефереры (2ГИС и др.) как отдельные строки
     const refRows = (await refRes.json()).data || [];
-    const ref2gis = refRows.filter(r => {
-      const n = (r.dimensions?.[0]?.name || r.dimensions?.[0]?.id || '').toLowerCase();
-      return n.includes('2gis') || n.includes('dgis') || n.includes('doublegis');
+
+    // Группируем домены рефереров в понятные источники
+    const DOMAIN_MAP = {
+      'link.2gis.ru':   { id: '2gis',      icon: '🗺️', name: '2ГИС',       hint: 'Переходы из профиля 2ГИС' },
+      'away.vk.ru':     { id: 'vk',         icon: '📱', name: 'ВКонтакте',   hint: 'Переходы из ВКонтакте' },
+      'm.vk.ru':        { id: 'vk',         icon: '📱', name: 'ВКонтакте',   hint: 'Переходы из ВКонтакте (моб.)' },
+      'vk.com':         { id: 'vk',         icon: '📱', name: 'ВКонтакте',   hint: 'Переходы из ВКонтакте' },
+      'dlvry.ru':       { id: 'dlvry',      icon: '🛵', name: 'Dlvry',       hint: 'Агрегатор доставки' },
+      'yandex.ru':      { id: 'yandex_ref', icon: '🔍', name: 'Яндекс (реф.)', hint: 'Переходы из сервисов Яндекса' },
+      'alice.yandex.ru':{ id: 'yandex_ref', icon: '🎙️', name: 'Алиса',       hint: 'Переходы через Алису' },
+    };
+
+    // Группируем ВКонтакте и 2ГИС
+    const refGrouped = {};
+    refRows.forEach(r => {
+      const domain = r.dimensions?.[0]?.name || '';
+      const info = DOMAIN_MAP[domain];
+      if (!info) return;
+      if (!refGrouped[info.id]) {
+        refGrouped[info.id] = { info, visits: 0, purchases: 0, revenue: 0 };
+      }
+      refGrouped[info.id].visits    += r.metrics?.[0] || 0;
+      refGrouped[info.id].purchases += r.metrics?.[1] || 0;
+      refGrouped[info.id].revenue   += r.metrics?.[2] || 0;
     });
-    // Объединяем — добавляем 2ГИС как отдельный источник
+
+    // Добавляем к источникам
     const allSrcRows = [...srcRows];
-    ref2gis.forEach(r => {
+    Object.values(refGrouped).forEach(g => {
       allSrcRows.push({
-        dimensions: [{ id: '2gis', name: '2ГИС' }, { id: 'referral', name: 'referral' }],
-        metrics: r.metrics
+        _refGroup: true,
+        _info: g.info,
+        dimensions: [{ id: g.info.id, name: g.info.name }],
+        metrics: [g.visits, g.purchases, g.revenue]
       });
     });
     const totalGoals  = srcRows.reduce((s,r) => s + (r.metrics?.[1]||0), 0);
