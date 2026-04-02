@@ -131,9 +131,13 @@ const server = http.createServer(async (req, res) => {
         // ecommerce: визиты, покупки, выручка по источникам
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastTrafficSource&date1=${date1}&date2=${date2}&limit=20`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
+      } else if (type === 'sources-detail') {
+        // Детализация: поисковик + тип источника + ecommerce
+        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastSearchEngine,ym:s:lastTrafficSource&date1=${date1}&date2=${date2}&limit=30`;
+        result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       } else if (type === 'utm') {
         // UTM campaigns
-        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits&dimensions=ym:s:UTMSource,ym:s:UTMCampaign&date1=${date1}&date2=${date2}&limit=50`;
+        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:UTMSource,ym:s:UTMMedium,ym:s:UTMCampaign&date1=${date1}&date2=${date2}&limit=50`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       } else if (type === 'summary') {
         // Summary visits
