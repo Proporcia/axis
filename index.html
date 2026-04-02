@@ -6,13 +6,12 @@
 <title>Axis — Аналитика</title>
 <script src="/chart.js"></script>
 <script>
-// ===== IIKO API =====
 const IIKO_API = '/api/iiko';
-let currentDays = 1;
-let revenueChart = null;
-let todayChart = null;
-let todayTimer = null;
-let todayCountdown = 300;
+let currentDays = 1;       // глобальный период, обновляется в loadMainData()
+let revenueChart = null;   // Chart.js instance для графика выручки
+let todayChart = null;     // Chart.js instance для графика по часам
+let todayTimer = null;     // setInterval для автообновления
+let todayCountdown = 300;  // секунды до следующего обновления
 
 function formatMoney(n) {
   return Math.round(n).toLocaleString('ru') + ' ₽';
@@ -31,116 +30,163 @@ function setBadge(id, text, color, bg) {
   el.style.background = bg || '#1a2d1a';
 }
 
-// ===== ГЛАВНАЯ — данные по периоду =====
+// ===== IIKO (Главная / Управленческая аналитика) =====
 async function loadMainData(days) {
   days = days || currentDays;
   currentDays = days;
-  setBadge('live-badge', '⏳ Загружаем данные...', '#555', '#1a1a1a');
-
+  setBadge('live-badge', '⏳ Загружаем данные iiko...', '#555', '#1a1a1a');
   try {
     const res = await fetch(IIKO_API + '?endpoint=orders&days=' + days);
-    if (!res.ok) { setBadge('live-badge', '❌ Ошибка загрузки', '#ff6b6b', '#2d1a1a'); return; }
+    if (!res.ok) throw new Error('Ошибка загрузки заказов');
     const data = await res.json();
     const orders = data.ordersByOrganizations?.[0]?.orders || [];
 
     if (orders.length === 0) {
       setBadge('live-badge', '📭 Нет данных за период', '#ffd27f', '#2d2a1a');
-      updateEl('m-ord', '0'); updateEl('m-rev', '0 ₽'); updateEl('m-check', '—');
+      document.getElementById('iiko-table-body').innerHTML = '<tr><td colspan="15">Нет данных</td></tr>';
       return;
     }
 
-    const totalOrders = orders.length;
-    const totalRevenue = orders.reduce((sum, o) => {
-      const pay = (o.order?.payments||[]).find(p => !p.isPreliminary);
-      return sum + (pay?.sum || 0);
-    }, 0);
-    const avgCheck = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+    // Группировка по дням (YYYY-MM-DD)
+    const daysMap = new Map(); // key: dateStr, value: объект с агрегатами
 
-    const times = orders
-      .filter(o => o.order?.whenCreated && o.order?.whenDelivered)
-      .map(o => Math.round((new Date(o.order.whenDelivered) - new Date(o.order.whenCreated)) / 60000))
-      .filter(t => t > 0 && t < 300);
-    const avgDelivery = times.length > 0 ? Math.round(times.reduce((a,b)=>a+b,0)/times.length) : 0;
+    for (const order of orders) {
+      const created = order.order?.whenCreated;
+      if (!created) continue;
+      const dateStr = created.slice(0,10); // "2026-04-02"
+      if (!daysMap.has(dateStr)) {
+        daysMap.set(dateStr, {
+          ordersCount: 0,
+          revenue: 0,
+          deliverySum: 0,
+          discountSum: 0,
+          cashSum: 0,
+          cardSum: 0,
+          qrSum: 0,
+          pickupCount: 0,
+        });
+      }
+      const day = daysMap.get(dateStr);
+      day.ordersCount += 1;
 
-    const byDay = {};
-    orders.forEach(o => {
-      const d = o.order?.whenCreated?.slice(0,10);
-      if (!d) return;
-      const p = (o.order?.payments||[]).find(p=>!p.isPreliminary);
-      byDay[d] = (byDay[d]||0) + (p?.sum||0);
-    });
+      // Выручка (финальный платёж)
+      const payments = order.order?.payments || [];
+      const finalPayment = payments.find(p => !p.isPreliminary);
+      const revenue = finalPayment?.sum || 0;
+      day.revenue += revenue;
 
-    // Top dishes
+      // Сумма доставки (если есть)
+      const deliveryAmount = order.order?.deliveryAmount || order.order?.deliveryPrice || 0;
+      day.deliverySum += deliveryAmount;
+
+      // Скидка (ищем поле discount, discards, или разницу между суммой позиций и платежом)
+      let discount = 0;
+      if (order.order?.discount) discount = order.order.discount;
+      else if (order.order?.discards && order.order.discards.length) {
+        discount = order.order.discards.reduce((acc, d) => acc + (d.sum || 0), 0);
+      } else {
+        const itemsSum = (order.order?.items || []).reduce((s, it) => s + (it.sum || 0), 0);
+        if (itemsSum > revenue) discount = itemsSum - revenue;
+      }
+      day.discountSum += discount;
+
+      // Типы оплат
+      for (const pay of payments) {
+        const type = pay.paymentTypeKind || pay.paymentTypeId || '';
+        const sum = pay.sum || 0;
+        if (type.toLowerCase().includes('cash') || type === '2' || type === 'Наличные') day.cashSum += sum;
+        else if (type.toLowerCase().includes('card') || type === '1' || type === 'Банковская карта') day.cardSum += sum;
+        else if (type.toLowerCase().includes('qr') || type === '3' || type === 'QR') day.qrSum += sum;
+        else {
+          day.cardSum += sum; // по умолчанию карта
+        }
+      }
+
+      // Самовывоз: если нет адреса или deliveryType = 'Pickup'
+      const deliveryPoint = order.order?.deliveryPoint;
+      const isPickup = !deliveryPoint || !deliveryPoint.address || order.order?.deliveryType === 'Pickup';
+      if (isPickup) day.pickupCount += 1;
+    }
+
+    // Преобразуем Map в массив и сортируем по дате (новые сверху)
+    const sortedDays = Array.from(daysMap.entries()).sort((a,b) => b[0].localeCompare(a[0]));
+
+    // Заполняем таблицу
+    const tbody = document.getElementById('iiko-table-body');
+    if (tbody) {
+      tbody.innerHTML = '';
+      for (const [date, day] of sortedDays) {
+        const row = tbody.insertRow();
+        const formattedDate = date.slice(5); // "04-02"
+        const discountPercent = day.revenue + day.discountSum > 0 ? (day.discountSum / (day.revenue + day.discountSum) * 100).toFixed(2) : 0;
+        const avgCheck = day.ordersCount > 0 ? Math.round(day.revenue / day.ordersCount) : 0;
+        // Себестоимость и наценка — пока заглушки
+        const costPercent = '—';
+        const markupPercent = '—';
+
+        row.insertCell(0).textContent = formattedDate;
+        row.insertCell(1).textContent = formatMoney(day.revenue);
+        row.insertCell(2).textContent = markupPercent;
+        row.insertCell(3).textContent = formatMoney(avgCheck);
+        row.insertCell(4).textContent = costPercent;
+        row.insertCell(5).textContent = formatMoney(day.revenue); // Тимирязева сумма = общая
+        row.insertCell(6).textContent = formatMoney(day.cashSum);
+        row.insertCell(7).textContent = formatMoney(day.cardSum);
+        row.insertCell(8).textContent = formatMoney(day.qrSum);
+        row.insertCell(9).textContent = formatMoney(avgCheck);      // С/ч Тим = общий с/ч
+        row.insertCell(10).textContent = formatMoney(day.deliverySum);
+        row.insertCell(11).textContent = discountPercent + '%';
+        row.insertCell(12).textContent = formatMoney(day.discountSum);
+        row.insertCell(13).textContent = day.ordersCount;
+        row.insertCell(14).textContent = day.pickupCount;
+      }
+    }
+
+    setBadge('live-badge', `🟢 IIKO · ${orders.length} заказов · период ${days} дн.`, '#4caf50', '#1a2d1a');
+
+    // График выручки по дням
+    const chartDays = Array.from(daysMap.entries()).sort((a,b) => a[0].localeCompare(b[0]));
+    const labels = chartDays.map(([d]) => d.slice(5));
+    const values = chartDays.map(([,v]) => Math.round(v.revenue / 1000));
+    const canvas = document.getElementById('ch-revenue');
+    if (canvas) {
+      if (revenueChart) revenueChart.destroy();
+      revenueChart = new Chart(canvas, {
+        type:'line',
+        data:{labels, datasets:[{data:values, borderColor:'#4a9eff', backgroundColor:'rgba(74,158,255,0.07)', fill:true, tension:0.4, pointRadius:3, borderWidth:2}]},
+        options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+          scales:{x:{grid:{display:false},ticks:{color:'#666',font:{size:10}}},
+            y:{grid:{color:'rgba(128,128,128,0.1)'},ticks:{color:'#666',font:{size:10},callback:v=>v+'к'}}}}
+      });
+    }
+
+    // Топ блюд
     const dishMap = {};
     orders.forEach(o => {
-      (o.order?.items||[]).forEach(item => {
+      (o.order?.items || []).forEach(item => {
         if (!item.name) return;
         if (!dishMap[item.name]) dishMap[item.name] = {count:0, sum:0};
-        dishMap[item.name].count += (item.amount||1);
-        dishMap[item.name].sum += (item.sum||0);
+        dishMap[item.name].count += (item.amount || 1);
+        dishMap[item.name].sum += (item.sum || 0);
       });
     });
     const topDishes = Object.entries(dishMap).sort((a,b)=>b[1].count-a[1].count).slice(0,5);
-
-    // Update metrics
-    updateEl('m-ord', totalOrders.toLocaleString('ru'));
-    updateEl('m-rev', formatMoney(totalRevenue));
-    updateEl('m-check', formatMoney(avgCheck));
-    updateEl('m-delivery', avgDelivery > 0 ? avgDelivery + ' мин' : '—');
-
-    setBadge('live-badge',
-      '🟢 Живые данные iiko · ' + totalOrders + ' заказов · доставка ~' + avgDelivery + ' мин',
-      '#4caf50', '#1a2d1a'
-    );
-
-    // Revenue chart
-    const sorted = Object.entries(byDay).sort((a,b)=>a[0].localeCompare(b[0]));
-    if (sorted.length > 0) {
-      const labels = sorted.map(([d]) => d.slice(5));
-      const values = sorted.map(([,v]) => Math.round(v/1000));
-      const canvas = document.getElementById('ch-revenue');
-      if (canvas) {
-        if (revenueChart) revenueChart.destroy();
-        revenueChart = new Chart(canvas, {
-          type:'line',
-          data:{labels, datasets:[{data:values, borderColor:'#4a9eff', backgroundColor:'rgba(74,158,255,0.07)', fill:true, tension:0.4, pointRadius:3, borderWidth:2}]},
-          options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-            scales:{x:{grid:{display:false},ticks:{color:'#666',font:{size:10}}},
-              y:{grid:{color:'rgba(128,128,128,0.1)'},ticks:{color:'#666',font:{size:10},callback:v=>v+'к'}}}}
-        });
-      }
-    }
-
-    // Top dishes
     const dishContainer = document.getElementById('top-dishes');
     if (dishContainer) {
-      if (topDishes.length === 0) {
-        dishContainer.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">Нет данных о блюдах</div>';
-      } else {
-        dishContainer.innerHTML = topDishes.map(([name, stat]) =>
-          `<div class="dish-row">
-            <div class="dish-name">${name}</div>
-            <div class="dish-stats">
-              <div class="dish-stat">Заказов<span>${Math.round(stat.count)}</span></div>
-              <div class="dish-stat">Выручка<span>${formatMoney(stat.sum)}</span></div>
-            </div>
-          </div>`
-        ).join('');
-      }
+      dishContainer.innerHTML = topDishes.length === 0
+        ? '<div style="color:var(--text3);font-size:12px;padding:10px 0">Нет данных о блюдах</div>'
+        : topDishes.map(([name, stat]) =>
+            `<div class="dish-row">
+              <div class="dish-name">${name}</div>
+              <div class="dish-stats">
+                <div class="dish-stat">Заказов<span>${Math.round(stat.count)}</span></div>
+                <div class="dish-stat">Выручка<span>${formatMoney(stat.sum)}</span></div>
+              </div>
+            </div>`).join('');
     }
 
-    // Cancels
-    fetch(IIKO_API + '?endpoint=cancels&days=' + days)
-      .then(r=>r.json())
-      .then(d => {
-        const cancels = d.ordersByOrganizations?.[0]?.orders || [];
-        updateEl('m-cancel', cancels.length);
-        const rate = totalOrders > 0 ? Math.round(cancels.length/(totalOrders+cancels.length)*100) : 0;
-        updateEl('m-cancel-d', rate + '% заказов');
-      }).catch(()=>{});
-
   } catch(e) {
-    console.log('main error:', e);
+    console.log('IIKO error:', e);
     setBadge('live-badge', '❌ Ошибка: ' + e.message, '#ff6b6b', '#2d1a1a');
   }
 }
@@ -172,9 +218,10 @@ async function loadTodayData() {
       .filter(t => t > 0 && t < 300);
     const avgDelivery = times.length > 0 ? Math.round(times.reduce((a,b)=>a+b,0)/times.length) : 0;
 
-    const sums = orders.map(o => { const p=(o.order?.payments||[]).find(p=>!p.isPreliminary); return p?.sum||0; }).filter(s=>s>0);
-    const maxOrder = sums.length > 0 ? Math.max(...sums) : 0;
-    const minOrder = sums.length > 0 ? Math.min(...sums) : 0;
+    const sums = orders.map(o => {
+      const p=(o.order?.payments||[]).find(p=>!p.isPreliminary);
+      return p?.sum||0;
+    }).filter(s=>s>0);
 
     const byHour = {};
     orders.forEach(o => {
@@ -186,10 +233,9 @@ async function loadTodayData() {
     updateEl('today-rev', formatMoney(totalRevenue));
     updateEl('today-check', formatMoney(avgCheck));
     updateEl('today-delivery', avgDelivery > 0 ? avgDelivery + ' мин' : '—');
-    updateEl('today-max', formatMoney(maxOrder));
-    updateEl('today-min', formatMoney(minOrder));
+    updateEl('today-max', sums.length > 0 ? formatMoney(Math.max(...sums)) : '—');
+    updateEl('today-min', sums.length > 0 ? formatMoney(Math.min(...sums)) : '—');
     updateEl('today-updated', 'Обновлено: ' + new Date().toLocaleTimeString('ru'));
-
     setBadge('today-badge', '🟢 Живые данные · ' + totalOrders + ' заказов сегодня', '#4caf50', '#1a2d1a');
 
     const canvas = document.getElementById('ch-today-hours');
@@ -218,7 +264,7 @@ async function loadTodayData() {
         const street = addr ? (addr.street?.name||'') + ' ' + (addr.house||'') : '';
         return `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:10px;font-size:12px;">
           <span style="color:var(--text3);min-width:42px">${time}</span>
-          <span style="flex:1;color:var(--text2)">${name}${street ? ' · <span style="color:var(--text3)">' + street + '</span>' : ''}</span>
+          <span style="flex:1;color:var(--text2)">${name}${street ? ' · ' + street : ''}</span>
           <span style="font-weight:700;min-width:70px;text-align:right">${formatMoney(sum)}</span>
           <span style="font-size:10px;min-width:20px;text-align:right;color:${status==='Closed'?'#4caf50':'#f39c12'}">${status==='Closed'?'✓':'⏳'}</span>
         </div>`;
@@ -278,9 +324,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--bg3); font-weight: 600; }
 .nav-icon { font-size: 16px; width: 20px; text-align: center; }
 .sidebar-bottom { margin-top: auto; padding: 12px 16px; border-top: 1px solid var(--border); }
-.company-switcher { display: flex; gap: 4px; background: var(--bg3); padding: 3px; border-radius: 8px; margin-bottom: 8px; }
-.sw-btn { flex: 1; text-align: center; padding: 5px 6px; border-radius: 6px; font-size: 10px; cursor: pointer; border: none; background: transparent; color: var(--text3); font-family: inherit; }
-.sw-btn.active { background: var(--bg2); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 .theme-btn { width: 100%; padding: 7px; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--text2); font-size: 11px; cursor: pointer; font-family: inherit; }
 .mob-nav { display: none; overflow-x: auto; background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 8px; }
 .mob-nav-item { padding: 10px 12px; font-size: 11px; color: var(--text3); cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; }
@@ -311,8 +354,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 .panel { background: var(--bg2); border-radius: 10px; padding: 14px; margin-bottom: 10px; border: 1px solid var(--border); }
 .panel-title { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; font-weight: 700; }
 .chart-wrap { position: relative; height: 160px; }
-.row2 { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 10px; }
-@media(min-width:600px) { .row2 { grid-template-columns: 1fr 1fr; } }
 .dish-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
 .dish-row:last-child { border-bottom: none; }
 .dish-name { color: var(--text2); flex: 1; }
@@ -322,39 +363,40 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 .green { color: #4caf50; }
 .red { color: #f44336; }
 .amber { color: #f39c12; }
+/* Стили для таблицы IIKO */
+table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 800px; }
+th, td { padding: 8px 6px; text-align: right; border-bottom: 1px solid var(--border); }
+th:first-child, td:first-child { text-align: left; background: var(--bg2); position: sticky; left: 0; }
+th { color: var(--text3); font-weight: 600; font-size: 10px; text-transform: uppercase; }
+td { color: var(--text2); }
 </style>
 </head>
 <body>
 <div class="app">
-
-<!-- SIDEBAR -->
 <div class="sidebar">
   <div class="logo-wrap">
     <div class="logo">Axis</div>
     <div class="logo-sub">сквозная аналитика</div>
   </div>
   <div class="nav-item" onclick="showSection('today',this)"><span class="nav-icon">⚡</span>Сегодня</div>
-  <div class="nav-item active" onclick="showSection('main',this)"><span class="nav-icon">📊</span>Главная</div>
+  <div class="nav-item active" onclick="showSection('main',this)"><span class="nav-icon">📊</span>IIKO</div>
   <div class="nav-item" onclick="showSection('traffic',this)"><span class="nav-icon">📈</span>Трафик</div>
   <div class="nav-item" onclick="showSection('cancels',this)"><span class="nav-icon">❌</span>Отмены</div>
   <div class="sidebar-bottom">
     <button class="theme-btn" onclick="toggleTheme()">🌙 Сменить тему</button>
   </div>
 </div>
-
-<!-- MAIN -->
 <div class="main">
   <div class="mob-nav">
     <div class="mob-nav-item" onclick="showSection('today',this)">⚡ Сегодня</div>
-    <div class="mob-nav-item active" onclick="showSection('main',this)">📊 Главная</div>
+    <div class="mob-nav-item active" onclick="showSection('main',this)">📊 IIKO</div>
     <div class="mob-nav-item" onclick="showSection('traffic',this)">📈 Трафик</div>
     <div class="mob-nav-item" onclick="showSection('cancels',this)">❌ Отмены</div>
   </div>
-
   <div class="topbar">
-    <div class="page-title" id="page-title">Главная</div>
+    <div class="page-title" id="page-title">IIKO</div>
     <div class="period-wrap">
-      <button class="pbtn active" id="btn-d1" onclick="setPeriod('d1',this)">Сегодня</button>
+      <button class="pbtn active" onclick="setPeriod('d1',this)">Сегодня</button>
       <button class="pbtn" onclick="setPeriod('w1',this)">1 нед</button>
       <button class="pbtn" onclick="setPeriod('w2',this)">2 нед</button>
       <button class="pbtn" onclick="setPeriod('m1',this)">1 мес</button>
@@ -362,194 +404,84 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
       <button class="cal-btn" id="cal-toggle-btn" onclick="toggleCal()">📅 Период</button>
     </div>
   </div>
-
   <div class="cal-popup" id="cal-popup">
     <div class="cal-row"><span class="cal-label">С</span><input type="date" class="date-input" id="date-from"></div>
     <div class="cal-row"><span class="cal-label">По</span><input type="date" class="date-input" id="date-to"></div>
     <button class="apply-btn" onclick="applyCustom()">Применить</button>
   </div>
-
   <div class="content">
-
-  <!-- СЕГОДНЯ -->
   <div class="section" id="section-today">
     <div id="today-badge" class="badge">⏳ Загружаем данные за сегодня...</div>
     <div style="text-align:right;font-size:11px;color:var(--text3);margin-bottom:8px;" id="today-updated"></div>
     <div class="metrics">
-      <div class="metric">
-        <div class="metric-label">Заказов сегодня</div>
-        <div class="metric-val" id="today-ord">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Выручка сегодня</div>
-        <div class="metric-val" id="today-rev">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Средний чек</div>
-        <div class="metric-val" id="today-check">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Время доставки</div>
-        <div class="metric-val" id="today-delivery">—</div>
-      </div>
+      <div class="metric"><div class="metric-label">Заказов сегодня</div><div class="metric-val" id="today-ord">—</div></div>
+      <div class="metric"><div class="metric-label">Выручка сегодня</div><div class="metric-val" id="today-rev">—</div></div>
+      <div class="metric"><div class="metric-label">Средний чек</div><div class="metric-val" id="today-check">—</div></div>
+      <div class="metric"><div class="metric-label">Время доставки</div><div class="metric-val" id="today-delivery">—</div></div>
     </div>
     <div class="metrics">
-      <div class="metric">
-        <div class="metric-label">Отмены</div>
-        <div class="metric-val red" id="today-cancel">—</div>
-        <div class="metric-delta" id="today-cancel-d"></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Макс. заказ</div>
-        <div class="metric-val" id="today-max">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Мин. заказ</div>
-        <div class="metric-val" id="today-min">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Обновление через</div>
-        <div class="metric-val accent" id="today-countdown">5:00</div>
-      </div>
+      <div class="metric"><div class="metric-label">Отмены</div><div class="metric-val red" id="today-cancel">—</div><div class="metric-delta" id="today-cancel-d"></div></div>
+      <div class="metric"><div class="metric-label">Макс. заказ</div><div class="metric-val" id="today-max">—</div></div>
+      <div class="metric"><div class="metric-label">Мин. заказ</div><div class="metric-val" id="today-min">—</div></div>
+      <div class="metric"><div class="metric-label">Обновление через</div><div class="metric-val" id="today-countdown">5:00</div></div>
     </div>
-    <div class="panel">
-      <div class="panel-title">Заказы по часам — сегодня</div>
-      <div class="chart-wrap"><canvas id="ch-today-hours"></canvas></div>
-    </div>
-    <div class="panel">
-      <div class="panel-title">Последние заказы</div>
-      <div id="today-orders-list"></div>
-    </div>
+    <div class="panel"><div class="panel-title">Заказы по часам — сегодня</div><div class="chart-wrap"><canvas id="ch-today-hours"></canvas></div></div>
+    <div class="panel"><div class="panel-title">Последние заказы</div><div id="today-orders-list"></div></div>
   </div>
-
-  <!-- ГЛАВНАЯ -->
   <div class="section active" id="section-main">
-    <div id="live-badge" class="badge">⏳ Подключаемся к iiko...</div>
-    <div class="metrics">
-      <div class="metric">
-        <div class="metric-label">Заказов</div>
-        <div class="metric-val" id="m-ord">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Выручка</div>
-        <div class="metric-val" id="m-rev">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Средний чек</div>
-        <div class="metric-val" id="m-check">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Время доставки</div>
-        <div class="metric-val" id="m-delivery">—</div>
-      </div>
-    </div>
-    <div class="metrics">
-      <div class="metric">
-        <div class="metric-label">Отмены</div>
-        <div class="metric-val red" id="m-cancel">—</div>
-        <div class="metric-delta" id="m-cancel-d"></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">ROAS</div>
-        <div class="metric-val" id="m-roas">— <span style="font-size:12px;color:var(--text3)">скоро</span></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">CAC</div>
-        <div class="metric-val" id="m-cac">— <span style="font-size:12px;color:var(--text3)">скоро</span></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Расходы реклама</div>
-        <div class="metric-val" id="m-spend">— <span style="font-size:12px;color:var(--text3)">скоро</span></div>
-      </div>
-    </div>
+    <div id="live-badge" class="badge">⏳ Загружаем данные iiko...</div>
     <div class="panel">
-      <div class="panel-title">Выручка по дням</div>
+      <div class="panel-title">Выручка по дням (тыс. ₽)</div>
       <div class="chart-wrap"><canvas id="ch-revenue"></canvas></div>
     </div>
+    <div class="panel" style="overflow-x: auto;">
+      <div class="panel-title">Детальная аналитика по дням</div>
+      <table id="iiko-table">
+        <thead>
+          <tr>
+            <th>Дата</th><th>Сумма со скидкой</th><th>Наценка(%)</th><th>С/ч общий</th><th>Себестоимость(%)</th>
+            <th>Тимирязева</th><th>Наличные</th><th>Гость нал</th><th>QR</th><th>С/ч Тим</th>
+            <th>Сумма доставки</th><th>% скидки</th><th>Сумма скидки</th><th>Заказов</th><th>Самовывоз</th>
+          </tr>
+        </thead>
+        <tbody id="iiko-table-body">
+          <tr><td colspan="15">Загрузка...</td></tr>
+        </tbody>
+      </table>
+    </div>
     <div class="panel">
-      <div class="panel-title">Топ блюд</div>
+      <div class="panel-title">Топ блюд за период</div>
       <div id="top-dishes"><div style="color:var(--text3);font-size:12px;">Загружаем...</div></div>
     </div>
   </div>
-
-
-  <!-- ТРАФИК -->
   <div class="section" id="section-traffic">
     <div id="traffic-badge" class="badge">⏳ Загружаем данные Метрики...</div>
-    
-    <!-- Сводка -->
     <div class="metrics">
-      <div class="metric">
-        <div class="metric-label">Визитов на сайт</div>
-        <div class="metric-val" id="t-visits">—</div>
-        <div class="metric-delta" id="t-visits-d"></div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Уникальных пользователей</div>
-        <div class="metric-val" id="t-users">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Конверсия сайт→заказ</div>
-        <div class="metric-val green" id="t-conv">—</div>
-        <div class="metric-delta" style="color:var(--text3);font-size:10px">визиты / заказы iiko</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Среднее время на сайте</div>
-        <div class="metric-val" id="t-duration">—</div>
-      </div>
+      <div class="metric"><div class="metric-label">Визитов на сайт</div><div class="metric-val" id="t-visits">—</div></div>
+      <div class="metric"><div class="metric-label">Уникальных пользователей</div><div class="metric-val" id="t-users">—</div></div>
+      <div class="metric"><div class="metric-label">Конверсия сайт→заказ</div><div class="metric-val green" id="t-conv">—</div><div class="metric-delta" style="color:var(--text3);font-size:10px">визиты Метрики / заказы iiko</div></div>
+      <div class="metric"><div class="metric-label">Среднее время на сайте</div><div class="metric-val" id="t-duration">—</div></div>
     </div>
-
-    <!-- Источники -->
-    <div class="panel">
-      <div class="panel-title">Источники трафика</div>
-      <div id="t-sources"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div>
-    </div>
-
-    <!-- UTM кампании -->
-    <div class="panel">
-      <div class="panel-title">UTM-кампании</div>
-      <div id="t-utm"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div>
-    </div>
-
-    <!-- Отказы -->
+    <div class="panel"><div class="panel-title">Источники трафика</div><div id="t-sources"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div></div>
+    <div class="panel"><div class="panel-title">UTM-кампании</div><div id="t-utm"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div></div>
     <div class="panel">
       <div class="panel-title">Показатель отказов</div>
       <div style="display:flex;align-items:center;gap:16px;padding:10px 0;">
         <div style="font-size:32px;font-weight:700;" id="t-bounce">—</div>
-        <div style="font-size:12px;color:var(--text3);line-height:1.6">
-          Процент людей которые<br>зашли и сразу ушли.<br>Норма для доставки еды: до 30%
-        </div>
+        <div style="font-size:12px;color:var(--text3);line-height:1.6">Процент людей которые зашли и сразу ушли.<br>Норма для доставки еды: до 30%</div>
       </div>
     </div>
   </div>
-
-  <!-- ОТМЕНЫ -->
   <div class="section" id="section-cancels">
     <div id="cancel-badge" class="badge">⏳ Загружаем отмены...</div>
     <div class="metrics">
-      <div class="metric">
-        <div class="metric-label">Отменено</div>
-        <div class="metric-val red" id="c-count">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">% от заказов</div>
-        <div class="metric-val amber" id="c-rate">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Потеряно выручки</div>
-        <div class="metric-val red" id="c-lost">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Средний отменённый</div>
-        <div class="metric-val" id="c-avg">—</div>
-      </div>
+      <div class="metric"><div class="metric-label">Отменено</div><div class="metric-val red" id="c-count">—</div></div>
+      <div class="metric"><div class="metric-label">% от заказов</div><div class="metric-val amber" id="c-rate">—</div></div>
+      <div class="metric"><div class="metric-label">Потеряно выручки</div><div class="metric-val red" id="c-lost">—</div></div>
+      <div class="metric"><div class="metric-label">Средний отменённый</div><div class="metric-val" id="c-avg">—</div></div>
     </div>
-    <div class="panel">
-      <div class="panel-title">Последние отмены</div>
-      <div id="cancel-list"></div>
-    </div>
+    <div class="panel"><div class="panel-title">Последние отмены</div><div id="cancel-list"></div></div>
   </div>
-
   </div>
 </div>
 </div>
@@ -562,7 +494,7 @@ function toggleTheme() {
   document.querySelector('.theme-btn').textContent = t === 'dark' ? '🌙 Сменить тему' : '☀️ Сменить тему';
 }
 
-const pageTitles = { today:'Сегодня', main:'Главная', traffic:'Трафик', cancels:'Отмены' };
+const pageTitles = { today:'Сегодня', main:'IIKO', traffic:'Трафик', cancels:'Отмены' };
 
 function showSection(id, el) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -573,7 +505,6 @@ function showSection(id, el) {
   });
   document.getElementById('page-title').textContent = pageTitles[id] || id;
   document.getElementById('cal-popup').classList.remove('show');
-
   if (id === 'cancels') loadCancelsSection();
   if (id === 'traffic') loadTrafficData();
 }
@@ -611,18 +542,14 @@ document.addEventListener('click', function(e) {
   if (!popup.contains(e.target) && e.target !== btn) popup.classList.remove('show');
 });
 
-
-// ===== ТРАФИК — МЕТРИКА =====
 async function loadTrafficData(days) {
   days = days || currentDays;
   setBadge('traffic-badge', '⏳ Загружаем данные Метрики...', '#555', '#1a1a1a');
   try {
-    // Get orders count for conversion
     const ordRes = await fetch('/api/iiko?endpoint=orders&days=' + days);
     const ordData = await ordRes.json();
     const ordersCount = ordData.ordersByOrganizations?.[0]?.orders?.length || 0;
 
-    // Summary
     const sumRes = await fetch('/api/metrika?type=summary&days=' + days);
     const sumData = await sumRes.json();
     const visits = sumData.data?.[0]?.metrics?.[0] || 0;
@@ -639,56 +566,42 @@ async function loadTrafficData(days) {
     updateEl('t-conv', conv + '%');
     updateEl('t-duration', durMin + ':' + String(durSec).padStart(2,'0'));
     updateEl('t-bounce', bounce.toFixed(1) + '%');
+    setBadge('traffic-badge', '🟢 Метрика · ' + Math.round(visits) + ' визитов · конверсия ' + conv + '%', '#4caf50', '#1a2d1a');
 
-    setBadge('traffic-badge',
-      '🟢 Метрика · ' + Math.round(visits) + ' визитов · ' + ordersCount + ' заказов · конверсия ' + conv + '%',
-      '#4caf50', '#1a2d1a'
-    );
-
-    // Sources
     const srcRes = await fetch('/api/metrika?type=sources&days=' + days);
     const srcData = await srcRes.json();
     const sources = srcData.data || [];
     const maxVisits = Math.max(...sources.map(s => s.metrics?.[0] || 0), 1);
 
     const sourceNames = {
-      'organic': '🔍 Органический поиск',
-      'referral': '🔗 Переходы по ссылкам',
-      'social': '📱 Соцсети',
-      'direct': '🏠 Прямые заходы',
-      'ad': '📢 Реклама',
-      'internal': '↩️ Внутренние переходы',
-      'email': '📧 Email',
-      'messenger': '💬 Мессенджеры',
-      'undefined': '❓ Не определён',
+      'organic':'🔍 Органический поиск', 'referral':'🔗 Переходы по ссылкам',
+      'social':'📱 Соцсети', 'direct':'🏠 Прямые заходы',
+      'ad':'📢 Реклама (Директ)', 'internal':'↩️ Внутренние',
+      'email':'📧 Email', 'messenger':'💬 Мессенджеры', 'undefined':'❓ Не определён',
     };
 
     const srcEl = document.getElementById('t-sources');
-    if (srcEl && sources.length > 0) {
-      srcEl.innerHTML = sources.map(s => {
-        const name = s.dimensions?.[0]?.name || s.dimensions?.[0]?.id || '—';
-        const v = Math.round(s.metrics?.[0] || 0);
-        const pct = Math.round((v / maxVisits) * 100);
-        const label = sourceNames[name] || name;
-        const share = visits > 0 ? Math.round((v/visits)*100) : 0;
-        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
-          <div style="min-width:180px;color:var(--text2)">${label}</div>
-          <div style="flex:1;background:var(--bg3);border-radius:3px;height:6px;overflow:hidden">
-            <div style="width:${pct}%;height:100%;background:#4a9eff;border-radius:3px"></div>
-          </div>
-          <div style="min-width:50px;text-align:right;font-weight:700">${v.toLocaleString('ru')}</div>
-          <div style="min-width:35px;text-align:right;color:var(--text3)">${share}%</div>
-        </div>`;
-      }).join('');
-    } else if (srcEl) {
-      srcEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">Нет данных</div>';
+    if (srcEl) {
+      srcEl.innerHTML = sources.length === 0
+        ? '<div style="color:var(--text3);font-size:12px;padding:10px 0">Нет данных</div>'
+        : sources.map(s => {
+            const name = s.dimensions?.[0]?.name || s.dimensions?.[0]?.id || '—';
+            const v = Math.round(s.metrics?.[0] || 0);
+            const pct = Math.round((v / maxVisits) * 100);
+            const label = sourceNames[name] || name;
+            const share = visits > 0 ? Math.round((v/visits)*100) : 0;
+            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
+              <div style="min-width:180px;color:var(--text2)">${label}</div>
+              <div style="flex:1;background:var(--bg3);border-radius:3px;height:6px;overflow:hidden"><div style="width:${pct}%;height:100%;background:#4a9eff;border-radius:3px"></div></div>
+              <div style="min-width:50px;text-align:right;font-weight:700">${v.toLocaleString('ru')}</div>
+              <div style="min-width:35px;text-align:right;color:var(--text3)">${share}%</div>
+            </div>`;
+          }).join('');
     }
 
-    // UTM campaigns
     const utmRes = await fetch('/api/metrika?type=utm&days=' + days);
     const utmData = await utmRes.json();
     const utms = utmData.data || [];
-
     const utmEl = document.getElementById('t-utm');
     if (utmEl) {
       if (utms.length === 0) {
@@ -703,22 +616,18 @@ async function loadTrafficData(days) {
           return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
             <div style="min-width:80px;color:#4a9eff;font-size:10px">${src}</div>
             <div style="flex:1;color:var(--text2)">${camp}</div>
-            <div style="width:80px;background:var(--bg3);border-radius:3px;height:5px;overflow:hidden">
-              <div style="width:${pct}%;height:100%;background:#9b59b6;border-radius:3px"></div>
-            </div>
+            <div style="width:80px;background:var(--bg3);border-radius:3px;height:5px;overflow:hidden"><div style="width:${pct}%;height:100%;background:#9b59b6;border-radius:3px"></div></div>
             <div style="min-width:40px;text-align:right;font-weight:700">${v}</div>
           </div>`;
         }).join('');
       }
     }
-
   } catch(e) {
     console.log('traffic error:', e);
     setBadge('traffic-badge', '❌ Ошибка загрузки Метрики', '#ff6b6b', '#2d1a1a');
   }
 }
 
-// Cancels section
 async function loadCancelsSection() {
   setBadge('cancel-badge', '⏳ Загружаем отмены...', '#555', '#1a1a1a');
   try {
@@ -726,43 +635,36 @@ async function loadCancelsSection() {
       fetch(IIKO_API + '?endpoint=cancels&days=' + currentDays),
       fetch(IIKO_API + '?endpoint=orders&days=' + currentDays)
     ]);
-    const dataC = await resC.json();
-    const dataO = await resO.json();
-    const cancels = dataC.ordersByOrganizations?.[0]?.orders || [];
-    const orders = dataO.ordersByOrganizations?.[0]?.orders || [];
+    const cancels = (await resC.json()).ordersByOrganizations?.[0]?.orders || [];
+    const orders = (await resO.json()).ordersByOrganizations?.[0]?.orders || [];
 
-    const totalOrders = orders.length;
     const lostRev = cancels.reduce((sum, o) => {
       const pay = (o.order?.payments||[]).find(p=>!p.isPreliminary);
       return sum + (pay?.sum||0);
     }, 0);
-    const avgCancel = cancels.length > 0 ? Math.round(lostRev / cancels.length) : 0;
-    const rate = totalOrders > 0 ? Math.round(cancels.length/(totalOrders+cancels.length)*100) : 0;
+    const rate = orders.length > 0 ? Math.round(cancels.length/(orders.length+cancels.length)*100) : 0;
 
     updateEl('c-count', cancels.length);
     updateEl('c-rate', rate + '%');
     updateEl('c-lost', formatMoney(lostRev));
-    updateEl('c-avg', formatMoney(avgCancel));
-    setBadge('cancel-badge', cancels.length + ' отмен за период · потеряно ' + formatMoney(lostRev), '#ff6b6b', '#2d1a1a');
+    updateEl('c-avg', cancels.length > 0 ? formatMoney(Math.round(lostRev/cancels.length)) : '—');
+    setBadge('cancel-badge', cancels.length + ' отмен · потеряно ' + formatMoney(lostRev), '#ff6b6b', '#2d1a1a');
 
     const list = document.getElementById('cancel-list');
     if (list) {
-      if (cancels.length === 0) {
-        list.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">Отмен нет 🎉</div>';
-      } else {
-        const recent = [...cancels].sort((a,b)=>new Date(b.order?.whenCreated)-new Date(a.order?.whenCreated)).slice(0,20);
-        list.innerHTML = recent.map(o => {
-          const pay = (o.order?.payments||[]).find(p=>!p.isPreliminary);
-          const sum = pay?.sum||0;
-          const time = o.order?.whenCreated?.slice(0,16)?.replace('T',' ')||'';
-          const name = o.order?.customer?.name||'Гость';
-          return `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:10px;font-size:12px;">
-            <span style="color:var(--text3);min-width:100px">${time.slice(5)}</span>
-            <span style="flex:1;color:var(--text2)">${name}</span>
-            <span style="font-weight:700;color:#ff6b6b">${formatMoney(sum)}</span>
-          </div>`;
-        }).join('');
-      }
+      list.innerHTML = cancels.length === 0
+        ? '<div style="color:var(--text3);font-size:12px;padding:10px 0">Отмен нет 🎉</div>'
+        : [...cancels].sort((a,b)=>new Date(b.order?.whenCreated)-new Date(a.order?.whenCreated)).slice(0,20).map(o => {
+            const pay = (o.order?.payments||[]).find(p=>!p.isPreliminary);
+            const sum = pay?.sum||0;
+            const time = o.order?.whenCreated?.slice(0,16)||'';
+            const name = o.order?.customer?.name||'Гость';
+            return `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:10px;font-size:12px;">
+              <span style="color:var(--text3);min-width:100px">${time.slice(5)}</span>
+              <span style="flex:1;color:var(--text2)">${name}</span>
+              <span style="font-weight:700;color:#ff6b6b">${formatMoney(sum)}</span>
+            </div>`;
+          }).join('');
     }
   } catch(e) { console.log('cancels error:', e); }
 }
