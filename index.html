@@ -2,16 +2,16 @@
 <html lang="ru" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Axis — Аналитика</title>
 <script src="/chart.js"></script>
 <script>
 const IIKO_API = '/api/iiko';
-let currentDays = 1;       // глобальный период, обновляется в loadMainData()
-let revenueChart = null;   // Chart.js instance для графика выручки
-let todayChart = null;     // Chart.js instance для графика по часам
-let todayTimer = null;     // setInterval для автообновления
-let todayCountdown = 300;  // секунды до следующего обновления
+let currentDays = 1;
+let revenueChart = null;
+let todayChart = null;
+let todayTimer = null;
+let todayCountdown = 300;
 
 function formatMoney(n) {
   return Math.round(n).toLocaleString('ru') + ' ₽';
@@ -30,7 +30,7 @@ function setBadge(id, text, color, bg) {
   el.style.background = bg || '#1a2d1a';
 }
 
-// ===== IIKO (Главная / Управленческая аналитика) =====
+// ===== IIKO (управленческая аналитика) =====
 async function loadMainData(days) {
   days = days || currentDays;
   currentDays = days;
@@ -47,13 +47,11 @@ async function loadMainData(days) {
       return;
     }
 
-    // Группировка по дням (YYYY-MM-DD)
-    const daysMap = new Map(); // key: dateStr, value: объект с агрегатами
-
+    const daysMap = new Map();
     for (const order of orders) {
       const created = order.order?.whenCreated;
       if (!created) continue;
-      const dateStr = created.slice(0,10); // "2026-04-02"
+      const dateStr = created.slice(0,10);
       if (!daysMap.has(dateStr)) {
         daysMap.set(dateStr, {
           ordersCount: 0,
@@ -68,18 +66,12 @@ async function loadMainData(days) {
       }
       const day = daysMap.get(dateStr);
       day.ordersCount += 1;
-
-      // Выручка (финальный платёж)
       const payments = order.order?.payments || [];
       const finalPayment = payments.find(p => !p.isPreliminary);
       const revenue = finalPayment?.sum || 0;
       day.revenue += revenue;
-
-      // Сумма доставки (если есть)
       const deliveryAmount = order.order?.deliveryAmount || order.order?.deliveryPrice || 0;
       day.deliverySum += deliveryAmount;
-
-      // Скидка (ищем поле discount, discards, или разницу между суммой позиций и платежом)
       let discount = 0;
       if (order.order?.discount) discount = order.order.discount;
       else if (order.order?.discards && order.order.discards.length) {
@@ -89,51 +81,40 @@ async function loadMainData(days) {
         if (itemsSum > revenue) discount = itemsSum - revenue;
       }
       day.discountSum += discount;
-
-      // Типы оплат
       for (const pay of payments) {
         const type = pay.paymentTypeKind || pay.paymentTypeId || '';
         const sum = pay.sum || 0;
         if (type.toLowerCase().includes('cash') || type === '2' || type === 'Наличные') day.cashSum += sum;
         else if (type.toLowerCase().includes('card') || type === '1' || type === 'Банковская карта') day.cardSum += sum;
         else if (type.toLowerCase().includes('qr') || type === '3' || type === 'QR') day.qrSum += sum;
-        else {
-          day.cardSum += sum; // по умолчанию карта
-        }
+        else day.cardSum += sum;
       }
-
-      // Самовывоз: если нет адреса или deliveryType = 'Pickup'
       const deliveryPoint = order.order?.deliveryPoint;
       const isPickup = !deliveryPoint || !deliveryPoint.address || order.order?.deliveryType === 'Pickup';
       if (isPickup) day.pickupCount += 1;
     }
 
-    // Преобразуем Map в массив и сортируем по дате (новые сверху)
     const sortedDays = Array.from(daysMap.entries()).sort((a,b) => b[0].localeCompare(a[0]));
-
-    // Заполняем таблицу
     const tbody = document.getElementById('iiko-table-body');
     if (tbody) {
       tbody.innerHTML = '';
       for (const [date, day] of sortedDays) {
         const row = tbody.insertRow();
-        const formattedDate = date.slice(5); // "04-02"
+        const formattedDate = date.slice(5);
         const discountPercent = day.revenue + day.discountSum > 0 ? (day.discountSum / (day.revenue + day.discountSum) * 100).toFixed(2) : 0;
         const avgCheck = day.ordersCount > 0 ? Math.round(day.revenue / day.ordersCount) : 0;
-        // Себестоимость и наценка — пока заглушки
         const costPercent = '—';
         const markupPercent = '—';
-
         row.insertCell(0).textContent = formattedDate;
         row.insertCell(1).textContent = formatMoney(day.revenue);
         row.insertCell(2).textContent = markupPercent;
         row.insertCell(3).textContent = formatMoney(avgCheck);
         row.insertCell(4).textContent = costPercent;
-        row.insertCell(5).textContent = formatMoney(day.revenue); // Тимирязева сумма = общая
+        row.insertCell(5).textContent = formatMoney(day.revenue);
         row.insertCell(6).textContent = formatMoney(day.cashSum);
         row.insertCell(7).textContent = formatMoney(day.cardSum);
         row.insertCell(8).textContent = formatMoney(day.qrSum);
-        row.insertCell(9).textContent = formatMoney(avgCheck);      // С/ч Тим = общий с/ч
+        row.insertCell(9).textContent = formatMoney(avgCheck);
         row.insertCell(10).textContent = formatMoney(day.deliverySum);
         row.insertCell(11).textContent = discountPercent + '%';
         row.insertCell(12).textContent = formatMoney(day.discountSum);
@@ -144,7 +125,6 @@ async function loadMainData(days) {
 
     setBadge('live-badge', `🟢 IIKO · ${orders.length} заказов · период ${days} дн.`, '#4caf50', '#1a2d1a');
 
-    // График выручки по дням
     const chartDays = Array.from(daysMap.entries()).sort((a,b) => a[0].localeCompare(b[0]));
     const labels = chartDays.map(([d]) => d.slice(5));
     const values = chartDays.map(([,v]) => Math.round(v.revenue / 1000));
@@ -160,7 +140,6 @@ async function loadMainData(days) {
       });
     }
 
-    // Топ блюд
     const dishMap = {};
     orders.forEach(o => {
       (o.order?.items || []).forEach(item => {
@@ -184,7 +163,6 @@ async function loadMainData(days) {
               </div>
             </div>`).join('');
     }
-
   } catch(e) {
     console.log('IIKO error:', e);
     setBadge('live-badge', '❌ Ошибка: ' + e.message, '#ff6b6b', '#2d1a1a');
@@ -262,12 +240,17 @@ async function loadTodayData() {
         const status = o.order?.status||'';
         const addr = o.order?.deliveryPoint?.address;
         const street = addr ? (addr.street?.name||'') + ' ' + (addr.house||'') : '';
-        return `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:10px;font-size:12px;">
-          <span style="color:var(--text3);min-width:42px">${time}</span>
-          <span style="flex:1;color:var(--text2)">${name}${street ? ' · ' + street : ''}</span>
-          <span style="font-weight:700;min-width:70px;text-align:right">${formatMoney(sum)}</span>
-          <span style="font-size:10px;min-width:20px;text-align:right;color:${status==='Closed'?'#4caf50':'#f39c12'}">${status==='Closed'?'✓':'⏳'}</span>
-        </div>`;
+        return `
+          <div class="order-item">
+            <div class="order-time">${time}</div>
+            <div class="order-info">
+              <div class="order-name">${name}</div>
+              <div class="order-address">${street || 'Самовывоз'}</div>
+            </div>
+            <div class="order-sum">${formatMoney(sum)}</div>
+            <div class="order-status ${status === 'Closed' ? 'status-closed' : 'status-pending'}">${status === 'Closed' ? '✓' : '⏳'}</div>
+          </div>
+        `;
       }).join('');
     }
 
@@ -277,7 +260,6 @@ async function loadTodayData() {
       const rate = totalOrders > 0 ? Math.round(cancels.length/(totalOrders+cancels.length)*100) : 0;
       updateEl('today-cancel-d', rate + '% от заказов');
     }).catch(()=>{});
-
   } catch(e) { console.log('today error:', e); }
 }
 
@@ -301,74 +283,284 @@ window.addEventListener('load', () => {
 </script>
 <style>
 :root[data-theme="dark"] {
-  --bg: #0f0f0f; --bg2: #1a1a1a; --bg3: #222; --bg4: #111;
-  --text: #fff; --text2: #aaa; --text3: #555;
-  --border: #2a2a2a; --border2: #333; --accent: #4a9eff;
+  --bg: #0f0f0f;
+  --bg2: #1a1a1a;
+  --bg3: #222;
+  --bg4: #111;
+  --text: #fff;
+  --text2: #aaa;
+  --text3: #555;
+  --border: #2a2a2a;
+  --border2: #333;
+  --accent: #4a9eff;
+  --card-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 :root[data-theme="light"] {
-  --bg: #f4f5f7; --bg2: #fff; --bg3: #e8e9eb; --bg4: #f0f1f3;
-  --text: #1a1a1a; --text2: #555; --text3: #999;
-  --border: #e0e0e0; --border2: #ccc; --accent: #2979ff;
+  --bg: #f4f5f7;
+  --bg2: #fff;
+  --bg3: #e8e9eb;
+  --bg4: #f0f1f3;
+  --text: #1a1a1a;
+  --text2: #555;
+  --text3: #999;
+  --border: #e0e0e0;
+  --border2: #ccc;
+  --accent: #2979ff;
+  --card-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  min-height: 100vh;
+}
 .app { display: flex; min-height: 100vh; }
-.sidebar { width: 200px; background: var(--bg2); border-right: 1px solid var(--border); padding: 16px 0; flex-shrink: 0; display: flex; flex-direction: column; }
+.sidebar {
+  width: 220px;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  padding: 20px 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
 .main { flex: 1; overflow-x: hidden; }
 @media(max-width:700px) { .sidebar { display: none; } .mob-nav { display: flex !important; } }
-.logo-wrap { padding: 0 16px 16px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
-.logo { font-size: 18px; font-weight: 700; color: var(--accent); }
-.logo-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
-.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; color: var(--text3); font-size: 13px; border-left: 3px solid transparent; transition: all 0.15s; }
+.logo-wrap { padding: 0 20px 20px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.logo { font-size: 20px; font-weight: 700; color: var(--accent); }
+.logo-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  cursor: pointer;
+  color: var(--text3);
+  font-size: 14px;
+  border-left: 3px solid transparent;
+  transition: all 0.2s ease;
+}
 .nav-item:hover { background: var(--bg3); color: var(--text); }
 .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--bg3); font-weight: 600; }
-.nav-icon { font-size: 16px; width: 20px; text-align: center; }
-.sidebar-bottom { margin-top: auto; padding: 12px 16px; border-top: 1px solid var(--border); }
-.theme-btn { width: 100%; padding: 7px; border: 1px solid var(--border); border-radius: 7px; background: transparent; color: var(--text2); font-size: 11px; cursor: pointer; font-family: inherit; }
-.mob-nav { display: none; overflow-x: auto; background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 8px; }
-.mob-nav-item { padding: 10px 12px; font-size: 11px; color: var(--text3); cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; }
+.nav-icon { font-size: 18px; width: 24px; text-align: center; }
+.sidebar-bottom { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); }
+.theme-btn {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text2);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: 0.2s;
+}
+.theme-btn:hover { background: var(--bg3); }
+.mob-nav {
+  display: none;
+  overflow-x: auto;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0 12px;
+  gap: 8px;
+}
+.mob-nav-item {
+  padding: 12px 8px;
+  font-size: 13px;
+  color: var(--text3);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: 0.2s;
+}
 .mob-nav-item.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-.topbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--bg2); flex-wrap: wrap; gap: 10px; }
-.page-title { font-size: 16px; font-weight: 700; }
-.period-wrap { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
-.pbtn { font-size: 11px; padding: 5px 10px; border: 1px solid var(--border2); border-radius: 6px; cursor: pointer; background: transparent; color: var(--text3); font-family: inherit; }
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.page-title { font-size: 20px; font-weight: 700; }
+.period-wrap { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pbtn, .cal-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text3);
+  font-family: inherit;
+  transition: 0.2s;
+}
+.pbtn:hover, .cal-btn:hover { background: var(--bg3); }
 .pbtn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-.cal-btn { font-size: 11px; padding: 5px 10px; border: 1px solid var(--border2); border-radius: 6px; cursor: pointer; background: transparent; color: var(--text3); font-family: inherit; }
 .cal-btn.active { border-color: var(--accent); color: var(--accent); }
-.cal-popup { display: none; position: absolute; background: var(--bg2); border: 1px solid var(--border2); border-radius: 10px; padding: 14px; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.3); right: 20px; top: 130px; }
+.cal-popup {
+  display: none;
+  position: absolute;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 16px;
+  padding: 16px;
+  z-index: 100;
+  box-shadow: var(--card-shadow);
+  right: 24px;
+  top: 100px;
+}
 .cal-popup.show { display: block; }
-.cal-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-.cal-label { font-size: 11px; color: var(--text3); min-width: 30px; }
-.date-input { background: var(--bg3); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 12px; font-family: inherit; }
-.apply-btn { background: var(--accent); border: none; border-radius: 6px; color: #fff; padding: 7px 14px; font-size: 12px; cursor: pointer; font-family: inherit; width: 100%; margin-top: 4px; }
-.content { padding: 16px 20px; }
+.cal-row { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+.cal-label { font-size: 12px; color: var(--text3); min-width: 30px; }
+.date-input {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.apply-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  width: 100%;
+  margin-top: 8px;
+}
+.content { padding: 20px 24px; }
 .section { display: none; }
 .section.active { display: block; }
-.badge { border-radius: 8px; padding: 8px 14px; font-size: 12px; margin-bottom: 12px; text-align: center; border: 1px solid #333; }
-.metrics { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 12px; }
-@media(min-width:600px) { .metrics { grid-template-columns: repeat(4,1fr); } }
-.metric { background: var(--bg2); border-radius: 10px; padding: 12px; border: 1px solid var(--border); }
-.metric-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; }
-.metric-val { font-size: 20px; font-weight: 700; line-height: 1.2; }
-.metric-delta { font-size: 11px; margin-top: 4px; color: var(--text3); }
-.panel { background: var(--bg2); border-radius: 10px; padding: 14px; margin-bottom: 10px; border: 1px solid var(--border); }
-.panel-title { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; font-weight: 700; }
-.chart-wrap { position: relative; height: 160px; }
-.dish-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.badge {
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 13px;
+  margin-bottom: 20px;
+  text-align: center;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.metric {
+  background: var(--bg2);
+  border-radius: 20px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  box-shadow: var(--card-shadow);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.metric:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+.metric-label { font-size: 12px; color: var(--text3); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.metric-val { font-size: 24px; font-weight: 700; line-height: 1.2; }
+.metric-delta { font-size: 11px; margin-top: 6px; color: var(--text3); }
+.panel {
+  background: var(--bg2);
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  box-shadow: var(--card-shadow);
+}
+.panel-title {
+  font-size: 13px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 16px;
+  font-weight: 700;
+}
+.chart-wrap { position: relative; height: 180px; }
+.dish-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
 .dish-row:last-child { border-bottom: none; }
 .dish-name { color: var(--text2); flex: 1; }
-.dish-stats { display: flex; gap: 12px; }
+.dish-stats { display: flex; gap: 16px; }
 .dish-stat { text-align: right; font-size: 11px; color: var(--text3); }
-.dish-stat span { display: block; font-weight: 700; color: var(--text); font-size: 12px; }
+.dish-stat span { display: block; font-weight: 700; color: var(--text); font-size: 14px; }
 .green { color: #4caf50; }
 .red { color: #f44336; }
 .amber { color: #f39c12; }
-/* Стили для таблицы IIKO */
+
+/* Таблица IIKO */
+.table-wrapper { overflow-x: auto; border-radius: 16px; }
 table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 800px; }
-th, td { padding: 8px 6px; text-align: right; border-bottom: 1px solid var(--border); }
+th, td { padding: 12px 8px; text-align: right; border-bottom: 1px solid var(--border); }
 th:first-child, td:first-child { text-align: left; background: var(--bg2); position: sticky; left: 0; }
-th { color: var(--text3); font-weight: 600; font-size: 10px; text-transform: uppercase; }
+th { color: var(--text3); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
 td { color: var(--text2); }
+
+/* Список заказов (вкладка "Сегодня") */
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.order-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg3);
+  border-radius: 16px;
+  transition: 0.2s;
+}
+.order-item:hover { background: var(--bg4); }
+.order-time {
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 50px;
+  font-size: 13px;
+}
+.order-info {
+  flex: 1;
+}
+.order-name { font-weight: 600; color: var(--text); }
+.order-address { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.order-sum {
+  font-weight: 700;
+  color: var(--text);
+  min-width: 80px;
+  text-align: right;
+}
+.order-status {
+  font-size: 16px;
+  min-width: 30px;
+  text-align: center;
+}
+.status-closed { color: #4caf50; }
+.status-pending { color: #f39c12; }
+
+/* Адаптив */
+@media (max-width: 600px) {
+  .content { padding: 16px; }
+  .metrics { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .metric-val { font-size: 18px; }
+  .order-item { flex-wrap: wrap; }
+  .order-time { min-width: 100%; }
+  .order-sum { margin-left: auto; }
+}
 </style>
 </head>
 <body>
@@ -410,78 +602,81 @@ td { color: var(--text2); }
     <button class="apply-btn" onclick="applyCustom()">Применить</button>
   </div>
   <div class="content">
-  <div class="section" id="section-today">
-    <div id="today-badge" class="badge">⏳ Загружаем данные за сегодня...</div>
-    <div style="text-align:right;font-size:11px;color:var(--text3);margin-bottom:8px;" id="today-updated"></div>
-    <div class="metrics">
-      <div class="metric"><div class="metric-label">Заказов сегодня</div><div class="metric-val" id="today-ord">—</div></div>
-      <div class="metric"><div class="metric-label">Выручка сегодня</div><div class="metric-val" id="today-rev">—</div></div>
-      <div class="metric"><div class="metric-label">Средний чек</div><div class="metric-val" id="today-check">—</div></div>
-      <div class="metric"><div class="metric-label">Время доставки</div><div class="metric-val" id="today-delivery">—</div></div>
-    </div>
-    <div class="metrics">
-      <div class="metric"><div class="metric-label">Отмены</div><div class="metric-val red" id="today-cancel">—</div><div class="metric-delta" id="today-cancel-d"></div></div>
-      <div class="metric"><div class="metric-label">Макс. заказ</div><div class="metric-val" id="today-max">—</div></div>
-      <div class="metric"><div class="metric-label">Мин. заказ</div><div class="metric-val" id="today-min">—</div></div>
-      <div class="metric"><div class="metric-label">Обновление через</div><div class="metric-val" id="today-countdown">5:00</div></div>
-    </div>
-    <div class="panel"><div class="panel-title">Заказы по часам — сегодня</div><div class="chart-wrap"><canvas id="ch-today-hours"></canvas></div></div>
-    <div class="panel"><div class="panel-title">Последние заказы</div><div id="today-orders-list"></div></div>
-  </div>
-  <div class="section active" id="section-main">
-    <div id="live-badge" class="badge">⏳ Загружаем данные iiko...</div>
-    <div class="panel">
-      <div class="panel-title">Выручка по дням (тыс. ₽)</div>
-      <div class="chart-wrap"><canvas id="ch-revenue"></canvas></div>
-    </div>
-    <div class="panel" style="overflow-x: auto;">
-      <div class="panel-title">Детальная аналитика по дням</div>
-      <table id="iiko-table">
-        <thead>
-          <tr>
-            <th>Дата</th><th>Сумма со скидкой</th><th>Наценка(%)</th><th>С/ч общий</th><th>Себестоимость(%)</th>
-            <th>Тимирязева</th><th>Наличные</th><th>Гость нал</th><th>QR</th><th>С/ч Тим</th>
-            <th>Сумма доставки</th><th>% скидки</th><th>Сумма скидки</th><th>Заказов</th><th>Самовывоз</th>
-          </tr>
-        </thead>
-        <tbody id="iiko-table-body">
-          <tr><td colspan="15">Загрузка...</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="panel">
-      <div class="panel-title">Топ блюд за период</div>
-      <div id="top-dishes"><div style="color:var(--text3);font-size:12px;">Загружаем...</div></div>
-    </div>
-  </div>
-  <div class="section" id="section-traffic">
-    <div id="traffic-badge" class="badge">⏳ Загружаем данные Метрики...</div>
-    <div class="metrics">
-      <div class="metric"><div class="metric-label">Визитов на сайт</div><div class="metric-val" id="t-visits">—</div></div>
-      <div class="metric"><div class="metric-label">Уникальных пользователей</div><div class="metric-val" id="t-users">—</div></div>
-      <div class="metric"><div class="metric-label">Конверсия сайт→заказ</div><div class="metric-val green" id="t-conv">—</div><div class="metric-delta" style="color:var(--text3);font-size:10px">визиты Метрики / заказы iiko</div></div>
-      <div class="metric"><div class="metric-label">Среднее время на сайте</div><div class="metric-val" id="t-duration">—</div></div>
-    </div>
-    <div class="panel"><div class="panel-title">Источники трафика</div><div id="t-sources"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div></div>
-    <div class="panel"><div class="panel-title">UTM-кампании</div><div id="t-utm"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div></div>
-    <div class="panel">
-      <div class="panel-title">Показатель отказов</div>
-      <div style="display:flex;align-items:center;gap:16px;padding:10px 0;">
-        <div style="font-size:32px;font-weight:700;" id="t-bounce">—</div>
-        <div style="font-size:12px;color:var(--text3);line-height:1.6">Процент людей которые зашли и сразу ушли.<br>Норма для доставки еды: до 30%</div>
+    <!-- Вкладка Сегодня -->
+    <div class="section" id="section-today">
+      <div id="today-badge" class="badge">⏳ Загружаем данные за сегодня...</div>
+      <div style="text-align:right;font-size:12px;color:var(--text3);margin-bottom:12px;" id="today-updated"></div>
+      <div class="metrics">
+        <div class="metric"><div class="metric-label">Заказов сегодня</div><div class="metric-val" id="today-ord">—</div></div>
+        <div class="metric"><div class="metric-label">Выручка сегодня</div><div class="metric-val" id="today-rev">—</div></div>
+        <div class="metric"><div class="metric-label">Средний чек</div><div class="metric-val" id="today-check">—</div></div>
+        <div class="metric"><div class="metric-label">Время доставки</div><div class="metric-val" id="today-delivery">—</div></div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="metric-label">Отмены</div><div class="metric-val red" id="today-cancel">—</div><div class="metric-delta" id="today-cancel-d"></div></div>
+        <div class="metric"><div class="metric-label">Макс. заказ</div><div class="metric-val" id="today-max">—</div></div>
+        <div class="metric"><div class="metric-label">Мин. заказ</div><div class="metric-val" id="today-min">—</div></div>
+        <div class="metric"><div class="metric-label">Обновление через</div><div class="metric-val" id="today-countdown">5:00</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Заказы по часам — сегодня</div>
+        <div class="chart-wrap"><canvas id="ch-today-hours"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Последние заказы</div>
+        <div id="today-orders-list" class="orders-list"></div>
       </div>
     </div>
-  </div>
-  <div class="section" id="section-cancels">
-    <div id="cancel-badge" class="badge">⏳ Загружаем отмены...</div>
-    <div class="metrics">
-      <div class="metric"><div class="metric-label">Отменено</div><div class="metric-val red" id="c-count">—</div></div>
-      <div class="metric"><div class="metric-label">% от заказов</div><div class="metric-val amber" id="c-rate">—</div></div>
-      <div class="metric"><div class="metric-label">Потеряно выручки</div><div class="metric-val red" id="c-lost">—</div></div>
-      <div class="metric"><div class="metric-label">Средний отменённый</div><div class="metric-val" id="c-avg">—</div></div>
+
+    <!-- Вкладка IIKO -->
+    <div class="section active" id="section-main">
+      <div id="live-badge" class="badge">⏳ Загружаем данные iiko...</div>
+      <div class="panel">
+        <div class="panel-title">Выручка по дням (тыс. ₽)</div>
+        <div class="chart-wrap"><canvas id="ch-revenue"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Детальная аналитика по дням</div>
+        <div class="table-wrapper">
+          <table id="iiko-table">
+            <thead>
+              <tr><th>Дата</th><th>Сумма со скидкой</th><th>Наценка(%)</th><th>С/ч общий</th><th>Себестоимость(%)</th><th>Тимирязева</th><th>Наличные</th><th>Гость нал</th><th>QR</th><th>С/ч Тим</th><th>Сумма доставки</th><th>% скидки</th><th>Сумма скидки</th><th>Заказов</th><th>Самовывоз</th></tr>
+            </thead>
+            <tbody id="iiko-table-body"><tr><td colspan="15">Загрузка...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Топ блюд за период</div>
+        <div id="top-dishes"><div style="color:var(--text3);font-size:12px;">Загружаем...</div></div>
+      </div>
     </div>
-    <div class="panel"><div class="panel-title">Последние отмены</div><div id="cancel-list"></div></div>
-  </div>
+
+    <!-- Вкладка Трафик -->
+    <div class="section" id="section-traffic">
+      <div id="traffic-badge" class="badge">⏳ Загружаем данные Метрики...</div>
+      <div class="metrics">
+        <div class="metric"><div class="metric-label">Визитов на сайт</div><div class="metric-val" id="t-visits">—</div></div>
+        <div class="metric"><div class="metric-label">Уникальных пользователей</div><div class="metric-val" id="t-users">—</div></div>
+        <div class="metric"><div class="metric-label">Конверсия сайт→заказ</div><div class="metric-val green" id="t-conv">—</div><div class="metric-delta">визиты / заказы</div></div>
+        <div class="metric"><div class="metric-label">Среднее время на сайте</div><div class="metric-val" id="t-duration">—</div></div>
+      </div>
+      <div class="panel"><div class="panel-title">Источники трафика</div><div id="t-sources"><div>Загружаем...</div></div></div>
+      <div class="panel"><div class="panel-title">UTM-кампании</div><div id="t-utm"><div>Загружаем...</div></div></div>
+      <div class="panel"><div class="panel-title">Показатель отказов</div><div style="display:flex;align-items:center;gap:16px;padding:10px 0;"><div style="font-size:32px;font-weight:700;" id="t-bounce">—</div><div style="font-size:12px;color:var(--text3);">Процент людей, которые зашли и сразу ушли. Норма: до 30%</div></div></div>
+    </div>
+
+    <!-- Вкладка Отмены -->
+    <div class="section" id="section-cancels">
+      <div id="cancel-badge" class="badge">⏳ Загружаем отмены...</div>
+      <div class="metrics">
+        <div class="metric"><div class="metric-label">Отменено</div><div class="metric-val red" id="c-count">—</div></div>
+        <div class="metric"><div class="metric-label">% от заказов</div><div class="metric-val amber" id="c-rate">—</div></div>
+        <div class="metric"><div class="metric-label">Потеряно выручки</div><div class="metric-val red" id="c-lost">—</div></div>
+        <div class="metric"><div class="metric-label">Средний отменённый</div><div class="metric-val" id="c-avg">—</div></div>
+      </div>
+      <div class="panel"><div class="panel-title">Последние отмены</div><div id="cancel-list"></div></div>
+    </div>
   </div>
 </div>
 </div>
@@ -549,18 +744,15 @@ async function loadTrafficData(days) {
     const ordRes = await fetch('/api/iiko?endpoint=orders&days=' + days);
     const ordData = await ordRes.json();
     const ordersCount = ordData.ordersByOrganizations?.[0]?.orders?.length || 0;
-
     const sumRes = await fetch('/api/metrika?type=summary&days=' + days);
     const sumData = await sumRes.json();
     const visits = sumData.data?.[0]?.metrics?.[0] || 0;
     const users = sumData.data?.[0]?.metrics?.[1] || 0;
     const bounce = sumData.data?.[0]?.metrics?.[2] || 0;
     const duration = sumData.data?.[0]?.metrics?.[3] || 0;
-
     const conv = visits > 0 ? ((ordersCount / visits) * 100).toFixed(1) : 0;
     const durMin = Math.floor(duration / 60);
     const durSec = Math.round(duration % 60);
-
     updateEl('t-visits', Math.round(visits).toLocaleString('ru'));
     updateEl('t-users', Math.round(users).toLocaleString('ru'));
     updateEl('t-conv', conv + '%');
@@ -572,31 +764,17 @@ async function loadTrafficData(days) {
     const srcData = await srcRes.json();
     const sources = srcData.data || [];
     const maxVisits = Math.max(...sources.map(s => s.metrics?.[0] || 0), 1);
-
-    const sourceNames = {
-      'organic':'🔍 Органический поиск', 'referral':'🔗 Переходы по ссылкам',
-      'social':'📱 Соцсети', 'direct':'🏠 Прямые заходы',
-      'ad':'📢 Реклама (Директ)', 'internal':'↩️ Внутренние',
-      'email':'📧 Email', 'messenger':'💬 Мессенджеры', 'undefined':'❓ Не определён',
-    };
-
+    const sourceNames = { 'organic':'🔍 Органический поиск', 'referral':'🔗 Переходы по ссылкам', 'social':'📱 Соцсети', 'direct':'🏠 Прямые заходы', 'ad':'📢 Реклама (Директ)', 'internal':'↩️ Внутренние', 'email':'📧 Email', 'messenger':'💬 Мессенджеры', 'undefined':'❓ Не определён' };
     const srcEl = document.getElementById('t-sources');
     if (srcEl) {
-      srcEl.innerHTML = sources.length === 0
-        ? '<div style="color:var(--text3);font-size:12px;padding:10px 0">Нет данных</div>'
-        : sources.map(s => {
-            const name = s.dimensions?.[0]?.name || s.dimensions?.[0]?.id || '—';
-            const v = Math.round(s.metrics?.[0] || 0);
-            const pct = Math.round((v / maxVisits) * 100);
-            const label = sourceNames[name] || name;
-            const share = visits > 0 ? Math.round((v/visits)*100) : 0;
-            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
-              <div style="min-width:180px;color:var(--text2)">${label}</div>
-              <div style="flex:1;background:var(--bg3);border-radius:3px;height:6px;overflow:hidden"><div style="width:${pct}%;height:100%;background:#4a9eff;border-radius:3px"></div></div>
-              <div style="min-width:50px;text-align:right;font-weight:700">${v.toLocaleString('ru')}</div>
-              <div style="min-width:35px;text-align:right;color:var(--text3)">${share}%</div>
-            </div>`;
-          }).join('');
+      srcEl.innerHTML = sources.length === 0 ? '<div style="color:var(--text3);">Нет данных</div>' : sources.map(s => {
+        const name = s.dimensions?.[0]?.name || s.dimensions?.[0]?.id || '—';
+        const v = Math.round(s.metrics?.[0] || 0);
+        const pct = Math.round((v / maxVisits) * 100);
+        const label = sourceNames[name] || name;
+        const share = visits > 0 ? Math.round((v/visits)*100) : 0;
+        return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);"><div style="min-width:160px;">${label}</div><div style="flex:1;background:var(--bg3);border-radius:20px;height:6px;"><div style="width:${pct}%;height:100%;background:#4a9eff;border-radius:20px;"></div></div><div style="min-width:50px;text-align:right;font-weight:700;">${v.toLocaleString('ru')}</div><div style="min-width:40px;text-align:right;color:var(--text3);">${share}%</div></div>`;
+      }).join('');
     }
 
     const utmRes = await fetch('/api/metrika?type=utm&days=' + days);
@@ -604,21 +782,15 @@ async function loadTrafficData(days) {
     const utms = utmData.data || [];
     const utmEl = document.getElementById('t-utm');
     if (utmEl) {
-      if (utms.length === 0) {
-        utmEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">UTM-меток не найдено за период</div>';
-      } else {
+      if (utms.length === 0) utmEl.innerHTML = '<div style="color:var(--text3);">UTM-меток не найдено</div>';
+      else {
         const maxU = Math.max(...utms.map(u => u.metrics?.[0] || 0), 1);
         utmEl.innerHTML = utms.slice(0,15).map(u => {
           const src = u.dimensions?.[0]?.name || '—';
           const camp = u.dimensions?.[1]?.name || '—';
           const v = Math.round(u.metrics?.[0] || 0);
           const pct = Math.round((v / maxU) * 100);
-          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
-            <div style="min-width:80px;color:#4a9eff;font-size:10px">${src}</div>
-            <div style="flex:1;color:var(--text2)">${camp}</div>
-            <div style="width:80px;background:var(--bg3);border-radius:3px;height:5px;overflow:hidden"><div style="width:${pct}%;height:100%;background:#9b59b6;border-radius:3px"></div></div>
-            <div style="min-width:40px;text-align:right;font-weight:700">${v}</div>
-          </div>`;
+          return `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);"><div style="min-width:80px;color:#4a9eff;">${src}</div><div style="flex:1;">${camp}</div><div style="width:80px;background:var(--bg3);border-radius:20px;height:5px;"><div style="width:${pct}%;height:100%;background:#9b59b6;border-radius:20px;"></div></div><div style="min-width:40px;text-align:right;">${v}</div></div>`;
         }).join('');
       }
     }
@@ -637,34 +809,22 @@ async function loadCancelsSection() {
     ]);
     const cancels = (await resC.json()).ordersByOrganizations?.[0]?.orders || [];
     const orders = (await resO.json()).ordersByOrganizations?.[0]?.orders || [];
-
-    const lostRev = cancels.reduce((sum, o) => {
-      const pay = (o.order?.payments||[]).find(p=>!p.isPreliminary);
-      return sum + (pay?.sum||0);
-    }, 0);
+    const lostRev = cancels.reduce((sum, o) => { const pay = (o.order?.payments||[]).find(p=>!p.isPreliminary); return sum + (pay?.sum||0); }, 0);
     const rate = orders.length > 0 ? Math.round(cancels.length/(orders.length+cancels.length)*100) : 0;
-
     updateEl('c-count', cancels.length);
     updateEl('c-rate', rate + '%');
     updateEl('c-lost', formatMoney(lostRev));
     updateEl('c-avg', cancels.length > 0 ? formatMoney(Math.round(lostRev/cancels.length)) : '—');
     setBadge('cancel-badge', cancels.length + ' отмен · потеряно ' + formatMoney(lostRev), '#ff6b6b', '#2d1a1a');
-
     const list = document.getElementById('cancel-list');
     if (list) {
-      list.innerHTML = cancels.length === 0
-        ? '<div style="color:var(--text3);font-size:12px;padding:10px 0">Отмен нет 🎉</div>'
-        : [...cancels].sort((a,b)=>new Date(b.order?.whenCreated)-new Date(a.order?.whenCreated)).slice(0,20).map(o => {
-            const pay = (o.order?.payments||[]).find(p=>!p.isPreliminary);
-            const sum = pay?.sum||0;
-            const time = o.order?.whenCreated?.slice(0,16)||'';
-            const name = o.order?.customer?.name||'Гость';
-            return `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:10px;font-size:12px;">
-              <span style="color:var(--text3);min-width:100px">${time.slice(5)}</span>
-              <span style="flex:1;color:var(--text2)">${name}</span>
-              <span style="font-weight:700;color:#ff6b6b">${formatMoney(sum)}</span>
-            </div>`;
-          }).join('');
+      list.innerHTML = cancels.length === 0 ? '<div style="color:var(--text3);padding:10px 0;">Отмен нет 🎉</div>' : cancels.slice(0,20).map(o => {
+        const pay = (o.order?.payments||[]).find(p=>!p.isPreliminary);
+        const sum = pay?.sum||0;
+        const time = o.order?.whenCreated?.slice(0,16)||'';
+        const name = o.order?.customer?.name||'Гость';
+        return `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:12px;"><span style="color:var(--text3);min-width:100px;">${time.slice(5)}</span><span style="flex:1;">${name}</span><span style="font-weight:700;color:#ff6b6b;">${formatMoney(sum)}</span></div>`;
+      }).join('');
     }
   } catch(e) { console.log('cancels error:', e); }
 }
