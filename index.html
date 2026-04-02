@@ -109,21 +109,26 @@ async function loadMainData(days) {
     updateEl('m-rev', formatMoney(totalRevenue));
     updateEl('m-check', formatMoney(avgCheck));
     updateEl('m-delivery', avgDelivery > 0 ? avgDelivery + ' мин' : '—');
-    updateEl('m-markup', '—'); // iiko delivery API не отдаёт себестоимость
-    updateEl('m-cost', '—');
+    const selfCount = orders.filter(o => !o.order?.deliveryPoint?.address?.street).length;
+    const delivCount = totalOrders - selfCount;
+
     updateEl('m-delivery-sum', formatMoney(deliveryFeeSum));
     updateEl('m-cash', formatMoney(cashSum));
     updateEl('m-qr', formatMoney(qrSum));
     updateEl('m-discount-sum', formatMoney(discountSum));
     updateEl('m-discount-pct', discountPct + '% от выручки');
+    updateEl('m-selfpickup', selfCount);
+    updateEl('m-ord-self', 'из ' + totalOrders + ' заказов');
+    updateEl('m-delivery-count', delivCount);
 
     setBadge('live-badge',
       '🟢 Живые данные iiko · ' + totalOrders + ' заказов · доставка ~' + avgDelivery + ' мин',
       '#4caf50', '#1a2d1a'
     );
 
-    // --- ПЛАН МЕСЯЦА ---
-    updatePlanProgress(totalRevenue);
+    // --- ПЛАН МЕСЯЦА (если смотрим текущий месяц — передаём выручку) ---
+    // Шкала плана всегда показывает текущий месяц независимо от периода
+    loadPlanData();
 
     // Revenue chart
     const sorted = Object.entries(byDay).sort((a,b)=>a[0].localeCompare(b[0]));
@@ -283,11 +288,34 @@ function startTodayCountdown() {
 // ===== ПЛАН МЕСЯЦА =====
 const MONTHLY_GOAL = 12000000; // 12 млн ₽
 
-function updatePlanProgress(currentRevenue) {
+async function loadPlanData() {
+  // Считаем сколько дней прошло с начала текущего месяца
+  const now = new Date();
+  const dayOfMonth = now.getDate();
+  // Запрашиваем данные за столько дней сколько прошло в этом месяце
+  try {
+    const res = await fetch('/api/iiko?endpoint=orders&days=' + dayOfMonth);
+    if (!res.ok) return;
+    const data = await res.json();
+    const orders = data.ordersByOrganizations?.[0]?.orders || [];
+    // Считаем только заказы текущего месяца (на случай если days перехватывает прошлый месяц)
+    const monthStr = now.toISOString().slice(0, 7); // "2026-04"
+    const monthOrders = orders.filter(o => (o.order?.whenCreated||'').startsWith(monthStr));
+    const monthRevenue = monthOrders.reduce((sum, o) => {
+      const pay = (o.order?.payments||[]).find(p => !p.isPreliminary);
+      return sum + (pay?.sum || 0);
+    }, 0);
+    updatePlanProgress(monthRevenue, dayOfMonth);
+  } catch(e) {
+    console.log('plan error:', e);
+  }
+}
+
+function updatePlanProgress(currentRevenue, dayOfMonth) {
+  dayOfMonth = dayOfMonth || new Date().getDate();
   const goal = MONTHLY_GOAL;
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-  const dayOfMonth = now.getDate();
   const daysLeft = daysInMonth - dayOfMonth;
 
   // Прогноз до конца месяца
@@ -345,9 +373,27 @@ function updatePlanProgress(currentRevenue) {
   }
 }
 
+async function loadMonthPlan() {
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const dayOfMonth = now.getDate();
+  const daysLeft = daysInMonth - dayOfMonth;
+  try {
+    const res = await fetch('/api/iiko?endpoint=orders&days=' + dayOfMonth);
+    const data = await res.json();
+    const orders = data.ordersByOrganizations?.[0]?.orders || [];
+    const monthRevenue = orders.reduce((sum, o) => {
+      const pay = (o.order?.payments||[]).find(p => !p.isPreliminary);
+      return sum + (pay?.sum || 0);
+    }, 0);
+    updatePlanProgress(monthRevenue, dayOfMonth, daysInMonth, daysLeft);
+  } catch(e) { console.log('plan error:', e); }
+}
+
 window.addEventListener('load', () => {
   loadMainData(1);
   loadTodayData();
+  loadMonthPlan();
   startTodayCountdown();
 });
 </script>
@@ -582,25 +628,26 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
     <!-- Ряд 2: Финансовые -->
     <div class="metrics">
       <div class="metric">
-        <div class="metric-label">Наценка</div>
-        <div class="metric-val green" id="m-markup">—</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Себестоимость</div>
-        <div class="metric-val" id="m-cost">—</div>
-      </div>
-      <div class="metric">
         <div class="metric-label">Сумма доставки</div>
         <div class="metric-val" id="m-delivery-sum">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Скидки</div>
+        <div class="metric-val amber" id="m-discount-sum">—</div>
+        <div class="metric-delta" id="m-discount-pct"></div>
       </div>
       <div class="metric">
         <div class="metric-label">Отмены</div>
         <div class="metric-val red" id="m-cancel">—</div>
         <div class="metric-delta" id="m-cancel-d"></div>
       </div>
+      <div class="metric">
+        <div class="metric-label">ROAS</div>
+        <div class="metric-val" id="m-roas">— <span style="font-size:12px;color:var(--text3)">скоро</span></div>
+      </div>
     </div>
 
-    <!-- Ряд 3: Оплаты и скидки -->
+    <!-- Ряд 3: Оплаты -->
     <div class="metrics">
       <div class="metric">
         <div class="metric-label">Наличные</div>
@@ -611,13 +658,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         <div class="metric-val" id="m-qr">—</div>
       </div>
       <div class="metric">
-        <div class="metric-label">Скидки</div>
-        <div class="metric-val amber" id="m-discount-sum">—</div>
-        <div class="metric-delta" id="m-discount-pct"></div>
+        <div class="metric-label">Самовывоз</div>
+        <div class="metric-val" id="m-selfpickup">—</div>
+        <div class="metric-delta" id="m-ord-self"></div>
       </div>
       <div class="metric">
-        <div class="metric-label">ROAS</div>
-        <div class="metric-val" id="m-roas">— <span style="font-size:12px;color:var(--text3)">скоро</span></div>
+        <div class="metric-label">Заказов доставкой</div>
+        <div class="metric-val" id="m-delivery-count">—</div>
       </div>
     </div>
 
