@@ -122,6 +122,9 @@ async function loadMainData(days) {
       '#4caf50', '#1a2d1a'
     );
 
+    // --- ПЛАН МЕСЯЦА ---
+    updatePlanProgress(totalRevenue);
+
     // Revenue chart
     const sorted = Object.entries(byDay).sort((a,b)=>a[0].localeCompare(b[0]));
     if (sorted.length > 0) {
@@ -274,6 +277,72 @@ function startTodayCountdown() {
     updateEl('today-countdown', m + ':' + String(s).padStart(2,'0'));
     if (todayCountdown <= 0) { loadTodayData(); todayCountdown = 300; }
   }, 1000);
+}
+
+
+// ===== ПЛАН МЕСЯЦА =====
+const MONTHLY_GOAL = 12000000; // 12 млн ₽
+
+function updatePlanProgress(currentRevenue) {
+  const goal = MONTHLY_GOAL;
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const dayOfMonth = now.getDate();
+  const daysLeft = daysInMonth - dayOfMonth;
+
+  // Прогноз до конца месяца
+  const dailyAvg = dayOfMonth > 0 ? currentRevenue / dayOfMonth : 0;
+  const forecast = currentRevenue + dailyAvg * daysLeft;
+
+  const pct = Math.min((currentRevenue / goal) * 100, 100);
+  const forecastPct = Math.min((forecast / goal) * 100, 100);
+
+  // Обновляем UI
+  const el = id => document.getElementById(id);
+
+  if (el('plan-current')) el('plan-current').textContent = formatMoney(currentRevenue);
+  if (el('plan-pct')) el('plan-pct').textContent = pct.toFixed(1) + '%';
+  if (el('plan-dates')) el('plan-dates').textContent = dayOfMonth + ' из ' + daysInMonth + ' дней';
+  if (el('plan-bar')) el('plan-bar').style.width = pct + '%';
+
+  // Прогноз
+  const forecastFormatted = formatMoney(Math.round(forecast));
+  if (el('plan-forecast')) {
+    el('plan-forecast').textContent = 'прогноз: ' + forecastFormatted;
+  }
+
+  // Статус — цвет и текст
+  const statusBox = el('plan-status-box');
+  const statusText = el('plan-status-text');
+  if (!statusBox || !statusText) return;
+
+  // Идеальный темп — сколько должно быть накоплено к этому дню
+  const expectedByNow = goal * (dayOfMonth / daysInMonth);
+  const lag = currentRevenue - expectedByNow;
+  const lagFormatted = Math.abs(Math.round(lag)).toLocaleString('ru');
+
+  if (pct >= 100) {
+    statusBox.style.background = 'rgba(46,204,113,0.15)';
+    statusBox.style.border = '1px solid rgba(46,204,113,0.3)';
+    statusText.style.color = '#2ecc71';
+    statusText.textContent = '🎉 План выполнен! Отличный результат!';
+  } else if (forecast >= goal) {
+    statusBox.style.background = 'rgba(74,158,255,0.1)';
+    statusBox.style.border = '1px solid rgba(74,158,255,0.3)';
+    statusText.style.color = '#4a9eff';
+    statusText.textContent = '✅ Идёте к цели — прогноз ' + forecastFormatted + ' (' + forecastPct.toFixed(0) + '% плана)';
+  } else if (lag >= 0) {
+    statusBox.style.background = 'rgba(46,204,113,0.1)';
+    statusBox.style.border = '1px solid rgba(46,204,113,0.2)';
+    statusText.style.color = '#2ecc71';
+    statusText.textContent = '⚡ Опережаете план на ' + lagFormatted + ' ₽';
+  } else {
+    const behind = goal - forecast;
+    statusBox.style.background = 'rgba(244,67,54,0.1)';
+    statusBox.style.border = '1px solid rgba(244,67,54,0.2)';
+    statusText.style.color = '#f44336';
+    statusText.textContent = '⚠️ Отстаёте от плана на ' + lagFormatted + ' ₽ · до цели нужно ещё ' + formatMoney(Math.round(behind));
+  }
 }
 
 window.addEventListener('load', () => {
@@ -454,6 +523,40 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
   <!-- ГЛАВНАЯ -->
   <div class="section active" id="section-main">
     <div id="live-badge" class="badge">⏳ Подключаемся к iiko...</div>
+
+    <!-- ПЛАН МЕСЯЦА -->
+    <div class="panel" id="plan-panel" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;font-weight:700;">📈 План месяца</div>
+        <div style="font-size:11px;color:var(--text3)" id="plan-dates"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+        <div>
+          <span style="font-size:22px;font-weight:700;" id="plan-current">—</span>
+          <span style="font-size:12px;color:var(--text3);margin-left:6px;">из</span>
+          <span style="font-size:16px;font-weight:600;color:var(--text2);margin-left:4px;" id="plan-goal">12 000 000 ₽</span>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:24px;font-weight:700;" id="plan-pct">—</div>
+          <div style="font-size:11px;color:var(--text3)" id="plan-forecast"></div>
+        </div>
+      </div>
+      <!-- Шкала -->
+      <div style="background:var(--bg3);border-radius:6px;height:12px;overflow:hidden;position:relative;">
+        <div id="plan-bar" style="height:100%;border-radius:6px;background:linear-gradient(90deg,#4a9eff,#2ecc71);transition:width 0.8s ease;width:0%;position:relative;">
+          <div style="position:absolute;right:0;top:50%;transform:translateY(-50%) translateX(50%);width:16px;height:16px;border-radius:50%;background:#2ecc71;border:2px solid var(--bg2);box-shadow:0 0 8px rgba(46,204,113,0.6);" id="plan-dot"></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--text3);">
+        <span>0</span>
+        <span id="plan-mid">6 млн</span>
+        <span>12 млн</span>
+      </div>
+      <!-- Статус -->
+      <div style="margin-top:10px;padding:7px 10px;border-radius:6px;font-size:12px;" id="plan-status-box">
+        <span id="plan-status-text"></span>
+      </div>
+    </div>
 
     <!-- Ряд 1: Основные -->
     <div class="metrics">
