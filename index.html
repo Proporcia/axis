@@ -682,8 +682,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
   <!-- ТРАФИК -->
   <div class="section" id="section-traffic">
     <div id="traffic-badge" class="badge">⏳ Загружаем данные Метрики...</div>
-    
-    <!-- Сводка -->
+
     <div class="metrics">
       <div class="metric">
         <div class="metric-label">Визитов на сайт</div>
@@ -691,41 +690,53 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         <div class="metric-delta" id="t-visits-d"></div>
       </div>
       <div class="metric">
-        <div class="metric-label">Уникальных пользователей</div>
-        <div class="metric-val" id="t-users">—</div>
+        <div class="metric-label">Покупок (Метрика)</div>
+        <div class="metric-val green" id="t-goals">—</div>
+        <div class="metric-delta">цель: /orderSuccess</div>
       </div>
       <div class="metric">
-        <div class="metric-label">Конверсия сайт→заказ</div>
-        <div class="metric-val green" id="t-conv">—</div>
-        <div class="metric-delta" style="color:var(--text3);font-size:10px">визиты / заказы iiko</div>
+        <div class="metric-label">Конверсия</div>
+        <div class="metric-val" id="t-conv">—</div>
+        <div class="metric-delta">визиты → покупка</div>
       </div>
       <div class="metric">
-        <div class="metric-label">Среднее время на сайте</div>
+        <div class="metric-label">~Выручка</div>
+        <div class="metric-val" id="t-est-rev">—</div>
+        <div class="metric-delta">покупки × ср.чек</div>
+      </div>
+    </div>
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Время на сайте</div>
         <div class="metric-val" id="t-duration">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Отказы</div>
+        <div class="metric-val" id="t-bounce">—</div>
+        <div class="metric-delta">норма: до 30%</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Глубина просмотра</div>
+        <div class="metric-val" id="t-depth">—</div>
+        <div class="metric-delta">страниц за визит</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Новых посетителей</div>
+        <div class="metric-val" id="t-new">—</div>
+        <div class="metric-delta" id="t-new-pct"></div>
       </div>
     </div>
 
-    <!-- Источники -->
     <div class="panel">
       <div class="panel-title">Источники трафика</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">Визиты · Покупки · Конверсия · ~Выручка</div>
       <div id="t-sources"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div>
     </div>
 
-    <!-- UTM кампании -->
     <div class="panel">
-      <div class="panel-title">UTM-кампании</div>
+      <div class="panel-title">UTM-кампании и рассылки</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">Директ, ВКонтакте, Сендлер, блогеры — по мере подключения UTM-меток</div>
       <div id="t-utm"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div>
-    </div>
-
-    <!-- Отказы -->
-    <div class="panel">
-      <div class="panel-title">Показатель отказов</div>
-      <div style="display:flex;align-items:center;gap:16px;padding:10px 0;">
-        <div style="font-size:32px;font-weight:700;" id="t-bounce">—</div>
-        <div style="font-size:12px;color:var(--text3);line-height:1.6">
-          Процент людей которые<br>зашли и сразу ушли.<br>Норма для доставки еды: до 30%
-        </div>
-      </div>
     </div>
   </div>
 
@@ -822,109 +833,142 @@ document.addEventListener('click', function(e) {
 async function loadTrafficData(days) {
   days = days || currentDays;
   setBadge('traffic-badge', '⏳ Загружаем данные Метрики...', '#555', '#1a1a1a');
+
+  const SRC = {
+    'organic':   { icon:'🔍', name:'Органический поиск',  hint:'Яндекс, Google, 2ГИС — без рекламы' },
+    'ad':        { icon:'📢', name:'Платная реклама',      hint:'Яндекс.Директ и другие рекламные системы' },
+    'social':    { icon:'📱', name:'Соцсети',              hint:'ВКонтакте, Instagram, Telegram и др.' },
+    'direct':    { icon:'🏠', name:'Прямые заходы',        hint:'Набрали адрес сами или открыли из закладок' },
+    'referral':  { icon:'🔗', name:'Переходы по ссылкам',  hint:'Сторонние сайты, агрегаторы' },
+    'messenger': { icon:'💬', name:'Мессенджеры',          hint:'Telegram, WhatsApp — ссылки из чатов' },
+    'email':     { icon:'📧', name:'Email / рассылки',     hint:'Переходы из писем' },
+    'internal':  { icon:'↩️', name:'Внутренние переходы',  hint:'Переходы внутри сайта' },
+    'undefined': { icon:'❓', name:'Не определён',         hint:'Источник не удалось определить' },
+  };
+  const UTM_SRC = {
+    'yandex':'📢 Яндекс.Директ','vk':'📱 ВКонтакте','vkontakte':'📱 ВКонтакте',
+    'senler':'💌 Сендлер','telegram':'✈️ Telegram','instagram':'📸 Instagram',
+    'blogger':'🎬 Блогер','2gis':'🗺️ 2ГИС','google':'🔍 Google',
+  };
+
   try {
-    // Get orders count for conversion
-    const ordRes = await fetch('/api/iiko?endpoint=orders&days=' + days);
-    const ordData = await ordRes.json();
-    const ordersCount = ordData.ordersByOrganizations?.[0]?.orders?.length || 0;
+    const [ordRes, sumRes, srcRes, utmRes] = await Promise.all([
+      fetch('/api/iiko?endpoint=orders&days=' + days),
+      fetch('/api/metrika?type=summary&days=' + days),
+      fetch('/api/metrika?type=sources&days=' + days),
+      fetch('/api/metrika?type=utm&days=' + days),
+    ]);
 
-    // Summary
-    const sumRes = await fetch('/api/metrika?type=summary&days=' + days);
-    const sumData = await sumRes.json();
-    const visits = sumData.data?.[0]?.metrics?.[0] || 0;
-    const users = sumData.data?.[0]?.metrics?.[1] || 0;
-    const bounce = sumData.data?.[0]?.metrics?.[2] || 0;
-    const duration = sumData.data?.[0]?.metrics?.[3] || 0;
+    const orders = (await ordRes.json()).ordersByOrganizations?.[0]?.orders || [];
+    const ordersCount = orders.length;
+    const totalRev = orders.reduce((s,o) => {
+      const p = (o.order?.payments||[]).find(p=>!p.isPreliminary);
+      return s + (p?.sum||0);
+    }, 0);
+    const avgCheck = ordersCount > 0 ? totalRev / ordersCount : 0;
 
-    const conv = visits > 0 ? ((ordersCount / visits) * 100).toFixed(1) : 0;
-    const durMin = Math.floor(duration / 60);
-    const durSec = Math.round(duration % 60);
+    const sumMetrics = (await sumRes.json()).data?.[0]?.metrics || [];
+    const visits   = sumMetrics[0] || 0;
+    const users    = sumMetrics[1] || 0;
+    const bounce   = sumMetrics[2] || 0;
+    const duration = sumMetrics[3] || 0;
+    const depth    = sumMetrics[4] || 0;
+    const newUsers = sumMetrics[5] || 0;
+
+    const sources = (await srcRes.json()).data || [];
+    const totalGoals = sources.reduce((s,r) => s + (r.metrics?.[1]||0), 0);
+    const conv = visits > 0 ? ((totalGoals/visits)*100).toFixed(1) : '0.0';
+    const estRev = totalGoals * avgCheck;
+    const durMin = Math.floor(duration/60);
+    const durSec = Math.round(duration%60);
+    const newPct = users > 0 ? Math.round((newUsers/users)*100) : 0;
 
     updateEl('t-visits', Math.round(visits).toLocaleString('ru'));
-    updateEl('t-users', Math.round(users).toLocaleString('ru'));
+    updateEl('t-visits-d', 'уникальных: ' + Math.round(users).toLocaleString('ru'));
+    updateEl('t-goals', Math.round(totalGoals).toLocaleString('ru'));
     updateEl('t-conv', conv + '%');
+    updateEl('t-est-rev', avgCheck > 0 ? formatMoney(Math.round(estRev)) : '—');
     updateEl('t-duration', durMin + ':' + String(durSec).padStart(2,'0'));
     updateEl('t-bounce', bounce.toFixed(1) + '%');
+    updateEl('t-depth', depth.toFixed(1));
+    updateEl('t-new', Math.round(newUsers).toLocaleString('ru'));
+    updateEl('t-new-pct', newPct + '% от посетителей');
 
     setBadge('traffic-badge',
-      '🟢 Метрика · ' + Math.round(visits) + ' визитов · ' + ordersCount + ' заказов · конверсия ' + conv + '%',
+      '🟢 Метрика · ' + Math.round(visits).toLocaleString('ru') + ' визитов · ' + Math.round(totalGoals) + ' покупок · конверсия ' + conv + '%',
       '#4caf50', '#1a2d1a'
     );
 
-    // Sources
-    const srcRes = await fetch('/api/metrika?type=sources&days=' + days);
-    const srcData = await srcRes.json();
-    const sources = srcData.data || [];
-    const maxVisits = Math.max(...sources.map(s => s.metrics?.[0] || 0), 1);
-
-    const sourceNames = {
-      'organic': '🔍 Органический поиск',
-      'referral': '🔗 Переходы по ссылкам',
-      'social': '📱 Соцсети',
-      'direct': '🏠 Прямые заходы',
-      'ad': '📢 Реклама',
-      'internal': '↩️ Внутренние переходы',
-      'email': '📧 Email',
-      'messenger': '💬 Мессенджеры',
-      'undefined': '❓ Не определён',
-    };
-
+    // Таблица источников
+    const maxV = Math.max(...sources.map(s=>s.metrics?.[0]||0), 1);
     const srcEl = document.getElementById('t-sources');
-    if (srcEl && sources.length > 0) {
-      srcEl.innerHTML = sources.map(s => {
-        const name = s.dimensions?.[0]?.name || s.dimensions?.[0]?.id || '—';
-        const v = Math.round(s.metrics?.[0] || 0);
-        const pct = Math.round((v / maxVisits) * 100);
-        const label = sourceNames[name] || name;
-        const share = visits > 0 ? Math.round((v/visits)*100) : 0;
-        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
-          <div style="min-width:180px;color:var(--text2)">${label}</div>
-          <div style="flex:1;background:var(--bg3);border-radius:3px;height:6px;overflow:hidden">
-            <div style="width:${pct}%;height:100%;background:#4a9eff;border-radius:3px"></div>
-          </div>
-          <div style="min-width:50px;text-align:right;font-weight:700">${v.toLocaleString('ru')}</div>
-          <div style="min-width:35px;text-align:right;color:var(--text3)">${share}%</div>
-        </div>`;
-      }).join('');
-    } else if (srcEl) {
-      srcEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">Нет данных</div>';
+    if (srcEl) {
+      srcEl.innerHTML = sources.length === 0
+        ? '<div style="color:var(--text3);font-size:12px;padding:10px 0">Нет данных</div>'
+        : sources.map(s => {
+            const key  = s.dimensions?.[0]?.id || s.dimensions?.[0]?.name || 'undefined';
+            const info = SRC[key] || {icon:'🌐', name:key, hint:''};
+            const v    = Math.round(s.metrics?.[0]||0);
+            const g    = Math.round(s.metrics?.[1]||0);
+            const cv   = v > 0 ? ((g/v)*100).toFixed(1) : '0.0';
+            const rev  = avgCheck > 0 ? formatMoney(Math.round(g*avgCheck)) : '—';
+            const bar  = Math.round((v/maxV)*100);
+            const share = visits > 0 ? Math.round((v/visits)*100) : 0;
+            return `<div style="padding:10px 0;border-bottom:1px solid var(--border);">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <span style="font-size:16px">${info.icon}</span>
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:600;color:var(--text)">${info.name}</div>
+                  <div style="font-size:10px;color:var(--text3)">${info.hint}</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:14px;font-weight:700">${v.toLocaleString('ru')} <span style="font-size:10px;color:var(--text3)">${share}%</span></div>
+                </div>
+              </div>
+              <div style="background:var(--bg3);border-radius:3px;height:4px;margin-bottom:8px;">
+                <div style="width:${bar}%;height:100%;background:#4a9eff;border-radius:3px;"></div>
+              </div>
+              <div style="display:flex;gap:16px;font-size:11px;">
+                <span style="color:var(--text3)">Покупок: <b style="color:#2ecc71">${g}</b></span>
+                <span style="color:var(--text3)">Конверсия: <b style="color:var(--text)">${cv}%</b></span>
+                <span style="color:var(--text3)">~Выручка: <b style="color:var(--text)">${rev}</b></span>
+              </div>
+            </div>`;
+          }).join('');
     }
 
-    // UTM campaigns
-    const utmRes = await fetch('/api/metrika?type=utm&days=' + days);
-    const utmData = await utmRes.json();
-    const utms = utmData.data || [];
-
+    // UTM кампании
+    const utms = (await utmRes.json()).data || [];
     const utmEl = document.getElementById('t-utm');
     if (utmEl) {
       if (utms.length === 0) {
-        utmEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">UTM-меток не найдено за период</div>';
+        utmEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">UTM-метки пока не обнаружены.<br>Появятся здесь когда запустите рекламу с UTM или рассылки через Сендлер.</div>';
       } else {
-        const maxU = Math.max(...utms.map(u => u.metrics?.[0] || 0), 1);
-        utmEl.innerHTML = utms.slice(0,15).map(u => {
-          const src = u.dimensions?.[0]?.name || '—';
-          const camp = u.dimensions?.[1]?.name || '—';
-          const v = Math.round(u.metrics?.[0] || 0);
-          const pct = Math.round((v / maxU) * 100);
-          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
-            <div style="min-width:80px;color:#4a9eff;font-size:10px">${src}</div>
-            <div style="flex:1;color:var(--text2)">${camp}</div>
-            <div style="width:80px;background:var(--bg3);border-radius:3px;height:5px;overflow:hidden">
-              <div style="width:${pct}%;height:100%;background:#9b59b6;border-radius:3px"></div>
+        const maxU = Math.max(...utms.map(u=>u.metrics?.[0]||0), 1);
+        utmEl.innerHTML = utms.slice(0,20).map(u => {
+          const srcKey   = (u.dimensions?.[0]?.name||'').toLowerCase();
+          const camp     = u.dimensions?.[1]?.name || 'без названия';
+          const srcLabel = UTM_SRC[srcKey] || ('🔗 ' + (u.dimensions?.[0]?.name||'—'));
+          const v   = Math.round(u.metrics?.[0]||0);
+          const bar = Math.round((v/maxU)*100);
+          return `<div style="padding:8px 0;border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <span style="font-size:11px;color:#4a9eff;min-width:130px">${srcLabel}</span>
+              <span style="font-size:12px;color:var(--text2);flex:1">${camp}</span>
+              <span style="font-size:13px;font-weight:700">${v}</span>
             </div>
-            <div style="min-width:40px;text-align:right;font-weight:700">${v}</div>
+            <div style="background:var(--bg3);border-radius:3px;height:3px;">
+              <div style="width:${bar}%;height:100%;background:#9b59b6;border-radius:3px;"></div>
+            </div>
           </div>`;
         }).join('');
       }
     }
-
   } catch(e) {
     console.log('traffic error:', e);
-    setBadge('traffic-badge', '❌ Ошибка загрузки Метрики', '#ff6b6b', '#2d1a1a');
+    setBadge('traffic-badge', '❌ Ошибка', '#ff6b6b', '#2d1a1a');
   }
 }
-
-// Cancels section
 async function loadCancelsSection() {
   setBadge('cancel-badge', '⏳ Загружаем отмены...', '#555', '#1a1a1a');
   try {
