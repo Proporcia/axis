@@ -447,6 +447,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
 .green { color: #4caf50; }
 .red { color: #f44336; }
 .amber { color: #f39c12; }
+.src-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media(min-width:700px) { .src-grid { grid-template-columns: repeat(3,1fr); } }
+.src-card { background: var(--bg3); border-radius: 10px; padding: 12px; border: 1px solid var(--border); }
+.src-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.src-card-icon { font-size: 20px; }
+.src-card-name { font-size: 12px; font-weight: 700; color: var(--text); line-height: 1.3; }
+.src-card-hint { font-size: 10px; color: var(--text3); }
+.src-card-bar { background: var(--bg2); border-radius: 3px; height: 4px; margin-bottom: 8px; }
+.src-card-bar-fill { height: 100%; border-radius: 3px; background: #4a9eff; }
+.src-card-stats { display: flex; flex-direction: column; gap: 3px; }
+.src-card-stat { display: flex; justify-content: space-between; font-size: 11px; }
+.src-card-stat-label { color: var(--text3); }
+.src-card-stat-val { font-weight: 700; color: var(--text); }
 </style>
 </head>
 <body>
@@ -664,6 +677,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
   <div class="section" id="section-traffic">
     <div id="traffic-badge" class="badge">⏳ Загружаем данные Метрики...</div>
 
+    <!-- Блок 1: Сводка -->
     <div class="metrics">
       <div class="metric">
         <div class="metric-label">Визитов на сайт</div>
@@ -671,53 +685,60 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         <div class="metric-delta" id="t-visits-d"></div>
       </div>
       <div class="metric">
-        <div class="metric-label">Покупок (ecom)</div>
+        <div class="metric-label">Покупок</div>
         <div class="metric-val green" id="t-goals">—</div>
-        <div class="metric-delta" id="t-goals-d">данные Метрики</div>
+        <div class="metric-delta" id="t-goals-d">ecommerce Метрика</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Выручка</div>
+        <div class="metric-val" id="t-est-rev">—</div>
+        <div class="metric-delta" id="t-rev-hint">из Метрики</div>
       </div>
       <div class="metric">
         <div class="metric-label">Конверсия</div>
         <div class="metric-val" id="t-conv">—</div>
         <div class="metric-delta" id="t-conv-hint">визиты → покупка</div>
       </div>
-      <div class="metric">
-        <div class="metric-label">Выручка (ecom)</div>
-        <div class="metric-val" id="t-est-rev">—</div>
-        <div class="metric-delta" id="t-rev-hint">данные Метрики</div>
-      </div>
-    </div>
-    <div class="metrics">
-      <div class="metric">
-        <div class="metric-label">Время на сайте</div>
-        <div class="metric-val" id="t-duration">—</div>
-        <div class="metric-delta" id="t-duration-hint">норма: 2-4 мин</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Отказы</div>
-        <div class="metric-val" id="t-bounce">—</div>
-        <div class="metric-delta" id="t-bounce-hint">норма: до 30%</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Глубина просмотра</div>
-        <div class="metric-val" id="t-depth">—</div>
-        <div class="metric-delta" id="t-depth-hint">норма: 3+ страниц</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">Новых посетителей</div>
-        <div class="metric-val" id="t-new">—</div>
-        <div class="metric-delta" id="t-new-pct"></div>
-      </div>
-    </div>
-        <div class="panel">
-      <div class="panel-title">Источники трафика</div>
-      <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">Визиты · Покупки · Конверсия · ~Выручка</div>
-      <div id="t-sources"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div>
     </div>
 
+    <!-- Блок 2: Источники трафика — карточки -->
+    <div class="panel">
+      <div class="panel-title">Источники трафика</div>
+      <div id="t-sources" class="src-grid"></div>
+    </div>
+
+    <!-- Блок 3: Поведение на сайте -->
+    <div class="panel">
+      <div class="panel-title">Поведение на сайте</div>
+      <div class="metrics" style="margin-bottom:0">
+        <div class="metric">
+          <div class="metric-label">Время на сайте</div>
+          <div class="metric-val" id="t-duration">—</div>
+          <div class="metric-delta" id="t-duration-hint">норма: 2-4 мин</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Отказы</div>
+          <div class="metric-val" id="t-bounce">—</div>
+          <div class="metric-delta" id="t-bounce-hint">норма: до 30%</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Глубина просмотра</div>
+          <div class="metric-val" id="t-depth">—</div>
+          <div class="metric-delta" id="t-depth-hint">норма: 3+ страниц</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Новых посетителей</div>
+          <div class="metric-val" id="t-new">—</div>
+          <div class="metric-delta" id="t-new-pct"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Блок 4: UTM-кампании -->
     <div class="panel">
       <div class="panel-title">UTM-кампании и рассылки</div>
-      <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">Директ, ВКонтакте, Сендлер, блогеры — по мере подключения UTM-меток</div>
-      <div id="t-utm"><div style="color:var(--text3);font-size:12px">Загружаем...</div></div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">Директ, ВКонтакте, Сендлер, блогеры — появятся автоматически когда запустите рекламу с UTM</div>
+      <div id="t-utm"></div>
     </div>
   </div>
 
@@ -815,47 +836,42 @@ async function loadTrafficData(days) {
   days = days || currentDays;
   setBadge('traffic-badge', '⏳ Загружаем данные Метрики...', '#555', '#1a1a1a');
 
-  // Словарь детальных источников
   const SRC_DETAIL = {
-    'yandex_search':  { icon:'🔍', name:'Яндекс — поиск',       hint:'Органическая выдача Яндекса' },
-    'yandex_mobile':  { icon:'🔍', name:'Яндекс Mobile',         hint:'Яндекс поиск с мобильных устройств' },
-    'google_search':  { icon:'🔍', name:'Google — поиск',        hint:'Органическая выдача Google' },
-    'google_mobile':  { icon:'🔍', name:'Google Mobile',         hint:'Google поиск с мобильных устройств' },
-    '2gis':           { icon:'🗺️', name:'2ГИС',                  hint:'Переходы из 2ГИС' },
-    'dgis':           { icon:'🗺️', name:'2ГИС',                  hint:'Переходы из 2ГИС' },
-    'double_gis':     { icon:'🗺️', name:'2ГИС',                  hint:'Переходы из 2ГИС' },
-    'yandex_maps':    { icon:'🗺️', name:'Яндекс.Карты',          hint:'Переходы из Яндекс.Карт' },
-    'yandex_direct':  { icon:'📢', name:'Яндекс.Директ',         hint:'Платная реклама Яндекс' },
-    'vkontakte':      { icon:'📱', name:'ВКонтакте',              hint:'Переходы из ВКонтакте' },
-    'telegram':       { icon:'✈️', name:'Telegram',               hint:'Переходы из Telegram' },
-    '':               { icon:'🏠', name:'Прямые заходы',          hint:'Набрали адрес сами или из закладок' },
+    'yandex_search':  { icon:'🔍', name:'Яндекс поиск',    hint:'Органическая выдача' },
+    'yandex_mobile':  { icon:'🔍', name:'Яндекс Mobile',    hint:'Яндекс с мобильных' },
+    'google_search':  { icon:'🔍', name:'Google поиск',     hint:'Органическая выдача' },
+    'google_mobile':  { icon:'🔍', name:'Google Mobile',    hint:'Google с мобильных' },
   };
   const SRC_TYPE = {
-    'organic': { icon:'🔍', name:'Органический поиск', hint:'Яндекс, Google и др. без рекламы' },
-    'ad':      { icon:'📢', name:'Платная реклама',    hint:'Яндекс.Директ и другие системы' },
-    'social':  { icon:'📱', name:'Соцсети',            hint:'ВКонтакте, Instagram, Telegram' },
-    'direct':  { icon:'🏠', name:'Прямые заходы',      hint:'Набрали адрес сами или из закладок' },
-    'referral':{ icon:'🔗', name:'Ссылки с сайтов',   hint:'Агрегаторы, сторонние сайты' },
-    'messenger':{ icon:'💬', name:'Мессенджеры',       hint:'Ссылки из чатов' },
-    'email':   { icon:'📧', name:'Email',              hint:'Переходы из писем' },
-    'undefined':{ icon:'❓', name:'Не определён',      hint:'Источник не удалось определить' },
+    'organic':   { icon:'🔍', name:'Органический поиск', hint:'Яндекс, Google без рекламы' },
+    'ad':        { icon:'📢', name:'Яндекс.Директ',      hint:'Платная реклама' },
+    'social':    { icon:'📱', name:'Соцсети',             hint:'ВКонтакте, Instagram' },
+    'direct':    { icon:'🏠', name:'Прямые заходы',       hint:'Из закладок или адресной строки' },
+    'referral':  { icon:'🔗', name:'Ссылки с сайтов',    hint:'Агрегаторы, партнёры' },
+    'messenger': { icon:'💬', name:'Мессенджеры',         hint:'Ссылки из чатов' },
+    'email':     { icon:'📧', name:'Email',               hint:'Из писем' },
+    'undefined': { icon:'❓', name:'Не определён',        hint:'' },
+  };
+  const DOMAIN_MAP = {
+    'link.2gis.ru':    { id:'2gis', icon:'🗺️', name:'2ГИС',       hint:'Из профиля 2ГИС' },
+    'away.vk.ru':      { id:'vk',   icon:'📱', name:'ВКонтакте',   hint:'Из ВКонтакте' },
+    'm.vk.ru':         { id:'vk',   icon:'📱', name:'ВКонтакте',   hint:'Из ВКонтакте (моб.)' },
+    'vk.com':          { id:'vk',   icon:'📱', name:'ВКонтакте',   hint:'Из ВКонтакте' },
+    'dlvry.ru':        { id:'dlvry',icon:'🛵', name:'Dlvry',       hint:'Агрегатор доставки' },
+    'alice.yandex.ru': { id:'alice',icon:'🎙️', name:'Алиса',       hint:'Через голосового помощника' },
+  };
+  const NAME_MAP = {
+    'Yandex, search results':'Яндекс поиск','Google, search results':'Google поиск',
+    'Yandex Mobile':'Яндекс Mobile','Google Mobile':'Google Mobile',
+    'Search engine traffic':'Поисковый трафик','Direct traffic':'Прямые заходы',
+    'Ad traffic':'Реклама (Директ)','Link traffic':'Ссылки с сайтов',
+    'Social network traffic':'Соцсети',
   };
   const UTM_SRC = {
     'yandex':'📢 Яндекс.Директ','vk':'📱 ВКонтакте','vkontakte':'📱 ВКонтакте',
     'senler':'💌 Сендлер','telegram':'✈️ Telegram','instagram':'📸 Instagram',
     'blogger':'🎬 Блогер','2gis':'🗺️ 2ГИС','google':'🔍 Google',
   };
-
-  function badge(val, good, ok, label) {
-    if (val >= good) return `<span style="color:#2ecc71">✅ Отлично (норма: ${label})</span>`;
-    if (val >= ok)   return `<span style="color:#f39c12">⚡ Норма (цель: ${label})</span>`;
-    return `<span style="color:#e74c3c">⚠️ Нужно улучшить (норма: ${label})</span>`;
-  }
-  function badgeLow(val, bad, ok, label) {
-    if (val <= bad) return `<span style="color:#2ecc71">✅ Отлично (норма: ${label})</span>`;
-    if (val <= ok)  return `<span style="color:#f39c12">⚡ Норма (до ${label})</span>`;
-    return `<span style="color:#e74c3c">⚠️ Высокий (норма: до ${label})</span>`;
-  }
 
   try {
     const [ordRes, sumRes, srcRes, refRes, utmRes] = await Promise.all([
@@ -867,75 +883,47 @@ async function loadTrafficData(days) {
     ]);
 
     const orders = (await ordRes.json()).ordersByOrganizations?.[0]?.orders || [];
-    const totalRev = orders.reduce((s,o) => {
-      const p = (o.order?.payments||[]).find(p=>!p.isPreliminary);
-      return s + (p?.sum||0);
-    }, 0);
+    const totalRev = orders.reduce((s,o)=>{const p=(o.order?.payments||[]).find(p=>!p.isPreliminary);return s+(p?.sum||0);},0);
     const avgCheck = orders.length > 0 ? totalRev / orders.length : 0;
 
     const sumM = (await sumRes.json()).data?.[0]?.metrics || [];
-    const visits   = sumM[0] || 0;
-    const users    = sumM[1] || 0;
-    const bounce   = sumM[2] || 0;
-    const duration = sumM[3] || 0;
-    const depth    = sumM[4] || 0;
-    const newUsers = sumM[5] || 0;
+    const visits=sumM[0]||0, users=sumM[1]||0, bounce=sumM[2]||0;
+    const duration=sumM[3]||0, depth=sumM[4]||0, newUsers=sumM[5]||0;
 
     const srcRows = (await srcRes.json()).data || [];
-    // Добавляем рефереры (2ГИС и др.) как отдельные строки
+    const totalGoals  = srcRows.reduce((s,r)=>s+(r.metrics?.[1]||0),0);
+    const totalMetRev = srcRows.reduce((s,r)=>s+(r.metrics?.[2]||0),0);
+    const conv = visits > 0 ? ((totalGoals/visits)*100) : 0;
+
+    // Группируем рефереры
     const refRows = (await refRes.json()).data || [];
-
-    // Группируем домены рефереров в понятные источники
-    const DOMAIN_MAP = {
-      'link.2gis.ru':   { id: '2gis',      icon: '🗺️', name: '2ГИС',       hint: 'Переходы из профиля 2ГИС' },
-      'away.vk.ru':     { id: 'vk',         icon: '📱', name: 'ВКонтакте',   hint: 'Переходы из ВКонтакте' },
-      'm.vk.ru':        { id: 'vk',         icon: '📱', name: 'ВКонтакте',   hint: 'Переходы из ВКонтакте (моб.)' },
-      'vk.com':         { id: 'vk',         icon: '📱', name: 'ВКонтакте',   hint: 'Переходы из ВКонтакте' },
-      'dlvry.ru':       { id: 'dlvry',      icon: '🛵', name: 'Dlvry',       hint: 'Агрегатор доставки' },
-      'yandex.ru':      { id: 'yandex_ref', icon: '🔍', name: 'Яндекс (реф.)', hint: 'Переходы из сервисов Яндекса' },
-      'alice.yandex.ru':{ id: 'yandex_ref', icon: '🎙️', name: 'Алиса',       hint: 'Переходы через Алису' },
-    };
-
-    // Группируем ВКонтакте и 2ГИС
     const refGrouped = {};
     refRows.forEach(r => {
       const domain = r.dimensions?.[0]?.name || '';
       const info = DOMAIN_MAP[domain];
       if (!info) return;
-      if (!refGrouped[info.id]) {
-        refGrouped[info.id] = { info, visits: 0, purchases: 0, revenue: 0 };
-      }
-      refGrouped[info.id].visits    += r.metrics?.[0] || 0;
-      refGrouped[info.id].purchases += r.metrics?.[1] || 0;
-      refGrouped[info.id].revenue   += r.metrics?.[2] || 0;
+      if (!refGrouped[info.id]) refGrouped[info.id] = {info, v:0, g:0, rev:0};
+      refGrouped[info.id].v   += r.metrics?.[0]||0;
+      refGrouped[info.id].g   += r.metrics?.[1]||0;
+      refGrouped[info.id].rev += r.metrics?.[2]||0;
     });
 
-    // Добавляем к источникам
-    const allSrcRows = [...srcRows];
+    // Объединяем источники
+    const allSrc = [...srcRows];
     Object.values(refGrouped).forEach(g => {
-      allSrcRows.push({
-        _refGroup: true,
-        _info: g.info,
-        dimensions: [{ id: g.info.id, name: g.info.name }],
-        metrics: [g.visits, g.purchases, g.revenue]
-      });
+      allSrc.push({ _ref: true, _info: g.info, metrics: [g.v, g.g, g.rev] });
     });
-    const totalGoals  = srcRows.reduce((s,r) => s + (r.metrics?.[1]||0), 0);
-    const totalMetRev = srcRows.reduce((s,r) => s + (r.metrics?.[2]||0), 0);
-    // (totals считаем без 2ГИС дублей чтобы не задваивать)
-    const conv = visits > 0 ? ((totalGoals/visits)*100) : 0;
-    const convStr = conv.toFixed(1);
+
+    // Сводка
     const durMin = Math.floor(duration/60);
     const durSec = Math.round(duration%60);
     const newPct = users > 0 ? Math.round((newUsers/users)*100) : 0;
 
-    // Карточки
     updateEl('t-visits', Math.round(visits).toLocaleString('ru'));
     updateEl('t-visits-d', 'уникальных: ' + Math.round(users).toLocaleString('ru'));
     updateEl('t-goals', Math.round(totalGoals).toLocaleString('ru'));
-    updateEl('t-goals-d', totalGoals > 0 ? 'ecommerce Метрика' : 'нет данных ecom');
-    updateEl('t-conv', convStr + '%');
     updateEl('t-est-rev', totalMetRev > 0 ? formatMoney(Math.round(totalMetRev)) : (totalGoals > 0 && avgCheck > 0 ? formatMoney(Math.round(totalGoals*avgCheck)) : '—'));
+    updateEl('t-conv', conv.toFixed(1) + '%');
     updateEl('t-duration', durMin + ':' + String(durSec).padStart(2,'0'));
     updateEl('t-bounce', bounce.toFixed(1) + '%');
     updateEl('t-depth', depth.toFixed(1));
@@ -943,140 +931,95 @@ async function loadTrafficData(days) {
     updateEl('t-new-pct', newPct + '% от посетителей · ' + (newPct > 70 ? '⚠️ Мало повторных' : newPct > 50 ? '⚡ Норма' : '✅ Хорошее удержание'));
 
     // Умные пояснения
-    const convEl = document.getElementById('t-conv-hint');
-    if (convEl) convEl.innerHTML = conv >= 8 ? '<span style="color:#2ecc71">✅ Отлично (норма: 3-5%)</span>'
-      : conv >= 4 ? '<span style="color:#2ecc71">✅ Хорошо (норма: 3-5%)</span>'
-      : conv >= 2 ? '<span style="color:#f39c12">⚡ Норма (цель: 5%+)</span>'
-      : '<span style="color:#e74c3c">⚠️ Нужно улучшить (норма: 3-5%)</span>';
-
-    const durEl = document.getElementById('t-duration-hint');
-    if (durEl) durEl.innerHTML = duration >= 180 ? '<span style="color:#2ecc71">✅ Хорошо (норма: 2-4 мин)</span>'
-      : duration >= 90 ? '<span style="color:#f39c12">⚡ Норма (цель: 3+ мин)</span>'
-      : '<span style="color:#e74c3c">⚠️ Мало (норма: 2-4 мин)</span>';
-
-    const bounceEl = document.getElementById('t-bounce-hint');
-    if (bounceEl) bounceEl.innerHTML = bounce <= 15 ? '<span style="color:#2ecc71">✅ Отлично (норма: до 30%)</span>'
-      : bounce <= 30 ? '<span style="color:#2ecc71">✅ Норма (до 30%)</span>'
-      : bounce <= 50 ? '<span style="color:#f39c12">⚡ Выше нормы (норма: до 30%)</span>'
-      : '<span style="color:#e74c3c">⚠️ Высокий (норма: до 30%)</span>';
-
-    const depthEl = document.getElementById('t-depth-hint');
-    if (depthEl) depthEl.innerHTML = depth >= 5 ? '<span style="color:#2ecc71">✅ Отлично (норма: 3+)</span>'
-      : depth >= 3 ? '<span style="color:#2ecc71">✅ Норма (3+ страниц)</span>'
-      : depth >= 2 ? '<span style="color:#f39c12">⚡ Норма (цель: 3+)</span>'
-      : '<span style="color:#e74c3c">⚠️ Мало (норма: 3+ страниц)</span>';
-
-    const revEl = document.getElementById('t-rev-hint');
-    if (revEl) revEl.innerHTML = totalMetRev > 0
-      ? '<span style="color:#2ecc71">из Метрики ecommerce</span>'
-      : '<span style="color:var(--text3)">расчётная: покупки × ср.чек</span>';
+    const hints = {
+      'conv': conv>=8?'<span style="color:#2ecc71">✅ Отлично (норма 3-5%)</span>':conv>=4?'<span style="color:#2ecc71">✅ Хорошо</span>':conv>=2?'<span style="color:#f39c12">⚡ Норма (цель 5%+)</span>':'<span style="color:#e74c3c">⚠️ Нужно улучшить</span>',
+      'dur':  duration>=180?'<span style="color:#2ecc71">✅ Хорошо</span>':duration>=90?'<span style="color:#f39c12">⚡ Норма</span>':'<span style="color:#e74c3c">⚠️ Мало (норма 2-4 мин)</span>',
+      'bnc':  bounce<=15?'<span style="color:#2ecc71">✅ Отлично</span>':bounce<=30?'<span style="color:#2ecc71">✅ Норма</span>':bounce<=50?'<span style="color:#f39c12">⚡ Выше нормы</span>':'<span style="color:#e74c3c">⚠️ Высокий</span>',
+      'dep':  depth>=5?'<span style="color:#2ecc71">✅ Отлично</span>':depth>=3?'<span style="color:#2ecc71">✅ Норма</span>':depth>=2?'<span style="color:#f39c12">⚡ Норма</span>':'<span style="color:#e74c3c">⚠️ Мало</span>',
+    };
+    const setHint = (id, html) => { const el=document.getElementById(id); if(el) el.innerHTML=html; };
+    setHint('t-conv-hint', hints.conv);
+    setHint('t-duration-hint', hints.dur);
+    setHint('t-bounce-hint', hints.bnc);
+    setHint('t-depth-hint', hints.dep);
+    setHint('t-rev-hint', totalMetRev > 0 ? '<span style="color:#2ecc71">ecommerce Метрика</span>' : '<span style="color:var(--text3)">~расчётная</span>');
 
     setBadge('traffic-badge',
-      '🟢 Метрика · ' + Math.round(visits).toLocaleString('ru') + ' визитов · ' + Math.round(totalGoals) + ' покупок · конверсия ' + convStr + '%',
+      '🟢 Метрика · ' + Math.round(visits).toLocaleString('ru') + ' визитов · ' + Math.round(totalGoals) + ' покупок · конверсия ' + conv.toFixed(1) + '%',
       '#4caf50', '#1a2d1a'
     );
 
-    // Таблица детальных источников
+    // Карточки источников
     const srcEl = document.getElementById('t-sources');
     if (srcEl) {
-      if (srcRows.length === 0) {
-        srcEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">Нет данных</div>';
+      const maxV = Math.max(...allSrc.map(s=>s.metrics?.[0]||0), 1);
+      if (allSrc.length === 0) {
+        srcEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0;grid-column:1/-1">Нет данных</div>';
       } else {
-        const maxV = Math.max(...srcRows.map(s=>s.metrics?.[0]||0), 1);
-        srcEl.innerHTML = srcRows.map(s => {
-          const searchId = s.dimensions?.[0]?.id || '';
-          const typeId   = s.dimensions?.[1]?.id || s.dimensions?.[1]?.name || 'undefined';
-          const searchName = s.dimensions?.[0]?.name || '';
-
-          // Определяем иконку и название
-          let icon, name, hint;
-          if (SRC_DETAIL[searchId]) {
-            ({ icon, name, hint } = SRC_DETAIL[searchId]);
-          } else if (searchName && searchId) {
-            const t = SRC_TYPE[typeId] || {icon:'🌐', name:typeId, hint:''};
-            icon = t.icon;
-            // Переводим английские названия
-            const nameMap = {
-              'Yandex, search results': 'Яндекс — поиск',
-              'Google, search results': 'Google — поиск',
-              'Yandex Mobile': 'Яндекс Mobile',
-              'Google Mobile': 'Google Mobile',
-              'Search engine traffic': 'Поисковый трафик',
-              'Direct traffic': 'Прямые заходы',
-              'Ad traffic': 'Рекламный трафик',
-              'Link traffic': 'Переходы по ссылкам',
-              'Social network traffic': 'Соцсети',
-            };
-            name = nameMap[searchName] || searchName.replace(', search results','').replace(' traffic','');
-            hint = t.hint;
+        srcEl.innerHTML = allSrc.map(s => {
+          let info;
+          if (s._ref) {
+            info = s._info;
           } else {
-            const t = SRC_TYPE[typeId] || {icon:'🌐', name:typeId, hint:''};
-            ({ icon, name, hint } = t);
+            const key = s.dimensions?.[0]?.id || '';
+            if (SRC_DETAIL[key]) {
+              info = SRC_DETAIL[key];
+            } else {
+              const typeId = s.dimensions?.[1]?.id || s.dimensions?.[1]?.name || 'undefined';
+              const t = SRC_TYPE[typeId] || {icon:'🌐', name:typeId, hint:''};
+              const sn = s.dimensions?.[0]?.name || '';
+              info = { icon: t.icon, name: NAME_MAP[sn] || sn || t.name, hint: t.hint };
+            }
           }
-
           const v   = Math.round(s.metrics?.[0]||0);
           const g   = Math.round(s.metrics?.[1]||0);
           const rev = s.metrics?.[2]||0;
-          const cv  = v > 0 ? ((g/v)*100).toFixed(1) : '0.0';
-          const revStr = rev > 0 ? formatMoney(Math.round(rev)) : (g > 0 && avgCheck > 0 ? '~'+formatMoney(Math.round(g*avgCheck)) : '—');
-          const bar  = Math.round((v/maxV)*100);
-          const share = visits > 0 ? Math.round((v/visits)*100) : 0;
-
-          return `<div style="padding:10px 0;border-bottom:1px solid var(--border);">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-              <span style="font-size:16px">${icon}</span>
-              <div style="flex:1">
-                <div style="font-size:13px;font-weight:600;color:var(--text)">${name}</div>
-                <div style="font-size:10px;color:var(--text3)">${hint}</div>
-              </div>
-              <div style="text-align:right">
-                <div style="font-size:14px;font-weight:700">${v.toLocaleString('ru')} <span style="font-size:10px;color:var(--text3)">${share}%</span></div>
+          const bar = Math.round((v/maxV)*100);
+          const revStr = rev > 0 ? formatMoney(Math.round(rev)) : (g>0&&avgCheck>0 ? '~'+formatMoney(Math.round(g*avgCheck)) : '—');
+          return `<div class="src-card">
+            <div class="src-card-header">
+              <span class="src-card-icon">${info.icon}</span>
+              <div>
+                <div class="src-card-name">${info.name}</div>
+                <div class="src-card-hint">${info.hint}</div>
               </div>
             </div>
-            <div style="background:var(--bg3);border-radius:3px;height:4px;margin-bottom:8px;">
-              <div style="width:${bar}%;height:100%;background:#4a9eff;border-radius:3px;"></div>
-            </div>
-            <div style="display:flex;gap:16px;font-size:11px;">
-              <span style="color:var(--text3)">Покупок: <b style="color:#2ecc71">${g}</b></span>
-              <span style="color:var(--text3)">Конверсия: <b style="color:var(--text)">${cv}%</b></span>
-              <span style="color:var(--text3)">Выручка: <b style="color:var(--text)">${revStr}</b></span>
+            <div class="src-card-bar"><div class="src-card-bar-fill" style="width:${bar}%"></div></div>
+            <div class="src-card-stats">
+              <div class="src-card-stat"><span class="src-card-stat-label">Визитов</span><span class="src-card-stat-val">${v.toLocaleString('ru')}</span></div>
+              <div class="src-card-stat"><span class="src-card-stat-label">Покупок</span><span class="src-card-stat-val" style="color:#2ecc71">${g}</span></div>
+              <div class="src-card-stat"><span class="src-card-stat-label">Выручка</span><span class="src-card-stat-val">${revStr}</span></div>
             </div>
           </div>`;
         }).join('');
       }
     }
 
-    // UTM кампании
+    // UTM таблица
     const utms = (await utmRes.json()).data || [];
     const utmEl = document.getElementById('t-utm');
     if (utmEl) {
       if (utms.length === 0) {
-        utmEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">UTM-метки пока не обнаружены.<br>Появятся здесь когда запустите рекламу с UTM или рассылки через Сендлер.</div>';
+        utmEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">UTM-метки пока не обнаружены за период.<br>Появятся здесь когда запустите рекламу с UTM или рассылки через Сендлер.</div>';
       } else {
-        const maxU = Math.max(...utms.map(u=>u.metrics?.[0]||0), 1);
-        utmEl.innerHTML = utms.slice(0,20).map(u => {
-          const srcKey  = (u.dimensions?.[0]?.name||'').toLowerCase();
-          const medium  = u.dimensions?.[1]?.name || '';
-          const camp    = u.dimensions?.[2]?.name || 'без названия';
-          const srcLabel = UTM_SRC[srcKey] || ('🔗 ' + (u.dimensions?.[0]?.name||'—'));
-          const v   = Math.round(u.metrics?.[0]||0);
-          const g   = Math.round(u.metrics?.[1]||0);
-          const rev = u.metrics?.[2]||0;
-          const bar = Math.round((v/maxU)*100);
-          return `<div style="padding:8px 0;border-bottom:1px solid var(--border);">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-              <span style="font-size:11px;color:#4a9eff;min-width:130px">${srcLabel}</span>
-              <span style="font-size:12px;color:var(--text2);flex:1">${camp}${medium ? ' · '+medium : ''}</span>
-              <span style="font-size:13px;font-weight:700">${v}</span>
-              ${g > 0 ? `<span style="font-size:11px;color:#2ecc71;min-width:50px;text-align:right">${g} покуп.</span>` : ''}
-            </div>
-            <div style="background:var(--bg3);border-radius:3px;height:3px;">
-              <div style="width:${bar}%;height:100%;background:#9b59b6;border-radius:3px;"></div>
-            </div>
+        utmEl.innerHTML = `<div style="display:grid;grid-template-columns:120px 1fr 60px 60px;gap:6px;font-size:11px;color:var(--text3);padding-bottom:6px;border-bottom:1px solid var(--border);font-weight:700;">
+          <div>Источник</div><div>Кампания</div><div style="text-align:right">Визиты</div><div style="text-align:right">Покупки</div>
+        </div>` + utms.slice(0,15).map(u => {
+          const srcKey = (u.dimensions?.[0]?.name||'').toLowerCase();
+          const camp   = u.dimensions?.[2]?.name || u.dimensions?.[1]?.name || 'без названия';
+          const label  = UTM_SRC[srcKey] || ('🔗 '+(u.dimensions?.[0]?.name||'—'));
+          const v = Math.round(u.metrics?.[0]||0);
+          const g = Math.round(u.metrics?.[1]||0);
+          return `<div style="display:grid;grid-template-columns:120px 1fr 60px 60px;gap:6px;font-size:12px;padding:7px 0;border-bottom:1px solid var(--border);align-items:center;">
+            <div style="color:#4a9eff;font-size:11px">${label}</div>
+            <div style="color:var(--text2)">${camp}</div>
+            <div style="text-align:right;font-weight:700">${v}</div>
+            <div style="text-align:right;font-weight:700;color:#2ecc71">${g||'—'}</div>
           </div>`;
         }).join('');
       }
     }
+
   } catch(e) {
     console.log('traffic error:', e);
     setBadge('traffic-badge', '❌ Ошибка', '#ff6b6b', '#2d1a1a');
