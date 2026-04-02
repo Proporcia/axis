@@ -132,8 +132,12 @@ const server = http.createServer(async (req, res) => {
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastTrafficSource&date1=${date1}&date2=${date2}&limit=20`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       } else if (type === 'sources-detail') {
-        // Детализация: поисковик + тип источника + ecommerce
+        // Детализация по поисковику + тип источника
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastSearchEngine,ym:s:lastTrafficSource&date1=${date1}&date2=${date2}&limit=30`;
+        result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
+      } else if (type === 'referrers') {
+        // Детализация рефереров — поймаем 2ГИС и другие сайты
+        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastReferralSource&date1=${date1}&date2=${date2}&limit=20`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       } else if (type === 'utm') {
         // UTM campaigns
