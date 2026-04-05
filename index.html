@@ -74,10 +74,16 @@ async function loadMainData(days) {
     const dishMap = {};
     orders.forEach(o => {
       (o.order?.items||[]).forEach(item => {
-        if (!item.name) return;
-        if (!dishMap[item.name]) dishMap[item.name] = {count:0, sum:0};
-        dishMap[item.name].count += (item.amount||1);
-        dishMap[item.name].sum += (item.sum||0);
+        // iiko: name может быть в item.name или item.productName
+        const name = item.name || item.productName || '';
+        if (!name) return;
+        // sum может отсутствовать — считаем через price * amount
+        const qty = item.amount || item.quantity || 1;
+        const price = item.price || (item.sum && qty > 0 ? item.sum/qty : 0);
+        const itemSum = item.sum || (price * qty) || 0;
+        if (!dishMap[name]) dishMap[name] = {count:0, sum:0};
+        dishMap[name].count += qty;
+        dishMap[name].sum += itemSum;
       });
     });
     const topDishes = Object.entries(dishMap).sort((a,b)=>b[1].count-a[1].count).slice(0,5);
@@ -143,7 +149,7 @@ async function loadMainData(days) {
           data:{labels, datasets:[{data:values, borderColor:'#4a9eff', backgroundColor:'rgba(74,158,255,0.07)', fill:true, tension:0.4, pointRadius:3, borderWidth:2}]},
           options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
             scales:{x:{grid:{display:false},ticks:{color:'#666',font:{size:10}}},
-              y:{grid:{color:'rgba(128,128,128,0.1)'},ticks:{color:'#666',font:{size:10},callback:v=>v+'к'}}}}
+              y:{grid:{color:'rgba(128,128,128,0.1)'},ticks:{color:'#666',font:{size:10},callback:v=>v>=1?v+'к':Math.round(v*1000)+' ₽'}}}}
         });
       }
     }
@@ -359,15 +365,21 @@ async function loadMonthPlan() {
   const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
   const dayOfMonth = now.getDate();
   const daysLeft = daysInMonth - dayOfMonth;
+  const currentMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
   try {
     const res = await fetch('/api/iiko?endpoint=orders&days=' + dayOfMonth);
     const data = await res.json();
-    const orders = data.ordersByOrganizations?.[0]?.orders || [];
+    const allOrders = data.ordersByOrganizations?.[0]?.orders || [];
+    // Фильтруем только текущий месяц
+    const orders = allOrders.filter(o => {
+      const d = o.order?.whenCreated || '';
+      return d.startsWith(currentMonth);
+    });
     const monthRevenue = orders.reduce((sum, o) => {
       const pay = (o.order?.payments||[]).find(p => !p.isPreliminary);
       return sum + (pay?.sum || 0);
     }, 0);
-    updatePlanProgress(monthRevenue, dayOfMonth, daysInMonth, daysLeft);
+    updatePlanProgress(monthRevenue, dayOfMonth);
   } catch(e) { console.log('plan error:', e); }
 }
 
