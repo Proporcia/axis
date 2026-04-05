@@ -755,6 +755,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
   <!-- КЛИЕНТЫ -->
   <div class="section" id="section-clients">
     <div id="clients-badge" class="badge">⏳ Загружаем данные клиентов...</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px;text-align:center;" id="cl-period"></div>
 
     <div class="metrics">
       <div class="metric">
@@ -799,6 +800,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         <div class="metric-val" id="cl-total-orders">—</div>
         <div class="metric-delta">за текущий месяц</div>
       </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Новые клиенты по дням</div>
+      <div class="chart-wrap"><canvas id="ch-clients-days"></canvas></div>
     </div>
 
     <div class="panel">
@@ -875,7 +881,15 @@ function setPeriod(p, btn) {
   document.getElementById('cal-toggle-btn').classList.remove('active');
   document.getElementById('cal-toggle-btn').textContent = '📅 Период';
   const daysMap = {d1:1, w1:7, w2:14, m1:30, m3:90};
-  loadMainData(daysMap[p]);
+  const days = daysMap[p];
+  loadMainData(days);
+  // Обновляем активную вкладку
+  const activeSection = document.querySelector('.section.active');
+  if (activeSection) {
+    const id = activeSection.id.replace('section-','');
+    if (id === 'traffic') loadTrafficData(days);
+    if (id === 'cancels') loadCancelsSection();
+  }
 }
 
 function toggleCal() {
@@ -1202,6 +1216,44 @@ async function loadClientsData() {
       '🟢 ' + totalClients + ' клиентов · ' + repeatPct + '% повторных · LTV ' + formatMoney(Math.round(avgLtv)),
       '#4caf50', '#1a2d1a'
     );
+
+    // Период
+    const now2 = new Date();
+    const monthName = now2.toLocaleString('ru', {month:'long', year:'numeric'});
+    const dayNum = now2.getDate();
+    const periodEl = document.getElementById('cl-period');
+    if (periodEl) periodEl.textContent = monthName.charAt(0).toUpperCase() + monthName.slice(1) + ' · с 1 по ' + dayNum + ' число';
+
+    // График новых клиентов по дням
+    const byDay = {};
+    const knownPhones = new Set();
+    // Сортируем по дате чтобы правильно определить "новых"
+    const sortedOrders = [...orders].sort((a,b) => new Date(a.order?.whenCreated) - new Date(b.order?.whenCreated));
+    sortedOrders.forEach(o => {
+      const phone = o.order?.customer?.phone || o.order?.phone || 'unknown';
+      const day = (o.order?.whenCreated||'').slice(8,10); // день месяца
+      if (!knownPhones.has(phone)) {
+        knownPhones.add(phone);
+        byDay[day] = (byDay[day]||0) + 1;
+      }
+    });
+
+    const chartCanvas = document.getElementById('ch-clients-days');
+    if (chartCanvas) {
+      const days = Array.from({length:dayNum}, (_,i) => String(i+1).padStart(2,'0'));
+      const vals = days.map(d => byDay[d]||0);
+      if (window._clientChart) window._clientChart.destroy();
+      window._clientChart = new Chart(chartCanvas, {
+        type: 'bar',
+        data: { labels: days.map(d=>d+'.04'), datasets: [{
+          data: vals, backgroundColor: 'rgba(46,204,113,0.6)', borderRadius: 3,
+          label: 'Новых клиентов'
+        }]},
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+          scales:{x:{grid:{display:false},ticks:{color:'#666',font:{size:10}}},
+            y:{grid:{color:'rgba(128,128,128,0.1)'},ticks:{color:'#666',font:{size:10},stepSize:1}}}}
+      });
+    }
 
     // Топ-10 клиентов
     const topClients = [...clients].sort((a,b) => b.revenue - a.revenue).slice(0, 10);
