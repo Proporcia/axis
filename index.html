@@ -482,6 +482,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
   <div class="nav-item" onclick="showSection('today',this)"><span class="nav-icon">⚡</span>Сегодня</div>
   <div class="nav-item active" onclick="showSection('main',this)"><span class="nav-icon">📊</span>Главная</div>
   <div class="nav-item" onclick="showSection('traffic',this)"><span class="nav-icon">📈</span>Трафик</div>
+  <div class="nav-item" onclick="showSection('clients',this)"><span class="nav-icon">👥</span>Клиенты</div>
   <div class="nav-item" onclick="showSection('cancels',this)"><span class="nav-icon">❌</span>Отмены</div>
   <div class="sidebar-bottom">
     <button class="theme-btn" onclick="toggleTheme()">🌙 Сменить тему</button>
@@ -494,6 +495,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
     <div class="mob-nav-item" onclick="showSection('today',this)">⚡ Сегодня</div>
     <div class="mob-nav-item active" onclick="showSection('main',this)">📊 Главная</div>
     <div class="mob-nav-item" onclick="showSection('traffic',this)">📈 Трафик</div>
+    <div class="mob-nav-item" onclick="showSection('clients',this)">👥 Клиенты</div>
     <div class="mob-nav-item" onclick="showSection('cancels',this)">❌ Отмены</div>
   </div>
 
@@ -750,6 +752,67 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
     </div>
   </div>
 
+  <!-- КЛИЕНТЫ -->
+  <div class="section" id="section-clients">
+    <div id="clients-badge" class="badge">⏳ Загружаем данные клиентов...</div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Уникальных клиентов</div>
+        <div class="metric-val" id="cl-unique">—</div>
+        <div class="metric-delta" id="cl-unique-d">за текущий месяц</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Новых клиентов</div>
+        <div class="metric-val green" id="cl-new">—</div>
+        <div class="metric-delta" id="cl-new-pct"></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Повторных клиентов</div>
+        <div class="metric-val" id="cl-repeat">—</div>
+        <div class="metric-delta" id="cl-repeat-pct"></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Средний LTV</div>
+        <div class="metric-val" id="cl-ltv">—</div>
+        <div class="metric-delta">выручка / клиент</div>
+      </div>
+    </div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Заказов на клиента</div>
+        <div class="metric-val" id="cl-orders-per">—</div>
+        <div class="metric-delta">среднее за месяц</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Макс. заказов (1 клиент)</div>
+        <div class="metric-val" id="cl-max-orders">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Самовывоз клиентов</div>
+        <div class="metric-val" id="cl-self">—</div>
+        <div class="metric-delta" id="cl-self-pct"></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Всего заказов</div>
+        <div class="metric-val" id="cl-total-orders">—</div>
+        <div class="metric-delta">за текущий месяц</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Топ клиентов по выручке</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:10px;">Телефоны скрыты из соображений конфиденциальности</div>
+      <div id="cl-top-list"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Распределение по количеству заказов</div>
+      <div id="cl-dist"></div>
+    </div>
+  </div>
+
   <!-- ОТМЕНЫ -->
   <div class="section" id="section-cancels">
     <div id="cancel-badge" class="badge">⏳ Загружаем отмены...</div>
@@ -789,7 +852,7 @@ function toggleTheme() {
   document.querySelector('.theme-btn').textContent = t === 'dark' ? '🌙 Сменить тему' : '☀️ Сменить тему';
 }
 
-const pageTitles = { today:'Сегодня', main:'Главная', traffic:'Трафик', cancels:'Отмены' };
+const pageTitles = { today:'Сегодня', main:'Главная', traffic:'Трафик', clients:'Клиенты', cancels:'Отмены' };
 
 function showSection(id, el) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -803,6 +866,7 @@ function showSection(id, el) {
 
   if (id === 'cancels') loadCancelsSection();
   if (id === 'traffic') loadTrafficData();
+  if (id === 'clients') loadClientsData();
 }
 
 function setPeriod(p, btn) {
@@ -1076,6 +1140,119 @@ async function loadTrafficData(days) {
     setBadge('traffic-badge', '❌ Ошибка', '#ff6b6b', '#2d1a1a');
   }
 }
+async function loadClientsData() {
+  setBadge('clients-badge', '⏳ Загружаем данные клиентов...', '#555', '#1a1a1a');
+  try {
+    const res = await fetch('/api/iiko?endpoint=month');
+    const data = await res.json();
+    const orders = data.ordersByOrganizations?.[0]?.orders || [];
+
+    if (orders.length === 0) {
+      setBadge('clients-badge', '📭 Нет данных за текущий месяц', '#ffd27f', '#2d2a1a');
+      return;
+    }
+
+    // Группируем по телефону
+    const clientMap = {};
+    orders.forEach(o => {
+      const phone = o.order?.customer?.phone || o.order?.phone || 'unknown';
+      const pay = (o.order?.payments||[]).find(p => !p.isPreliminary);
+      const sum = pay?.sum || 0;
+      const name = o.order?.customer?.name || 'Гость';
+      const isSelf = !o.order?.deliveryPoint?.address?.street;
+
+      if (!clientMap[phone]) {
+        clientMap[phone] = { phone, name, orders: 0, revenue: 0, selfPickup: 0 };
+      }
+      clientMap[phone].orders++;
+      clientMap[phone].revenue += sum;
+      if (isSelf) clientMap[phone].selfPickup++;
+    });
+
+    const clients = Object.values(clientMap);
+    const totalClients = clients.length;
+    const totalOrders = orders.length;
+    const totalRevenue = clients.reduce((s,c) => s+c.revenue, 0);
+
+    // Новые vs повторные
+    const newClients = clients.filter(c => c.orders === 1).length;
+    const repeatClients = clients.filter(c => c.orders > 1).length;
+    const selfClients = clients.filter(c => c.selfPickup > 0).length;
+    const maxOrders = Math.max(...clients.map(c => c.orders));
+    const avgLtv = totalClients > 0 ? totalRevenue / totalClients : 0;
+    const avgOrdersPer = totalClients > 0 ? (totalOrders / totalClients).toFixed(1) : 0;
+    const newPct = totalClients > 0 ? Math.round((newClients/totalClients)*100) : 0;
+    const repeatPct = totalClients > 0 ? Math.round((repeatClients/totalClients)*100) : 0;
+    const selfPct = totalClients > 0 ? Math.round((selfClients/totalClients)*100) : 0;
+
+    updateEl('cl-unique', totalClients.toLocaleString('ru'));
+    updateEl('cl-unique-d', 'за текущий месяц · ' + totalOrders + ' заказов');
+    updateEl('cl-new', newClients.toLocaleString('ru'));
+    updateEl('cl-new-pct', newPct + '% от клиентов');
+    updateEl('cl-repeat', repeatClients.toLocaleString('ru'));
+    updateEl('cl-repeat-pct', repeatPct + '% · заказывают снова ✅');
+    updateEl('cl-ltv', formatMoney(Math.round(avgLtv)));
+    updateEl('cl-orders-per', avgOrdersPer);
+    updateEl('cl-max-orders', maxOrders);
+    updateEl('cl-self', selfClients.toLocaleString('ru'));
+    updateEl('cl-self-pct', selfPct + '% от клиентов');
+    updateEl('cl-total-orders', totalOrders.toLocaleString('ru'));
+
+    setBadge('clients-badge',
+      '🟢 ' + totalClients + ' клиентов · ' + repeatPct + '% повторных · LTV ' + formatMoney(Math.round(avgLtv)),
+      '#4caf50', '#1a2d1a'
+    );
+
+    // Топ-10 клиентов
+    const topClients = [...clients].sort((a,b) => b.revenue - a.revenue).slice(0, 10);
+    const listEl = document.getElementById('cl-top-list');
+    if (listEl) {
+      listEl.innerHTML = topClients.map((c, i) => {
+        // Маскируем телефон: +7(9**)**-**-89
+        const masked = c.phone.replace(/(\+?\d{1,2})(\d{3})(\d{3})(\d{2})(\d{2})/, '$1($2)***-**-$5');
+        const badge = c.orders > 5 ? '🔥' : c.orders > 2 ? '⭐' : '';
+        return `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:10px;font-size:12px;">
+          <span style="color:var(--text3);min-width:20px;font-weight:700">${i+1}</span>
+          <span style="min-width:16px">${badge}</span>
+          <span style="flex:1;color:var(--text2)">${masked}</span>
+          <span style="color:var(--text3);min-width:60px">${c.orders} заказ${c.orders===1?'':c.orders<5?'а':'ов'}</span>
+          <span style="font-weight:700;min-width:80px;text-align:right">${formatMoney(c.revenue)}</span>
+        </div>`;
+      }).join('');
+    }
+
+    // Распределение по количеству заказов
+    const dist = {};
+    clients.forEach(c => {
+      const key = c.orders >= 5 ? '5+' : String(c.orders);
+      dist[key] = (dist[key]||0) + 1;
+    });
+    const distEl = document.getElementById('cl-dist');
+    if (distEl) {
+      const maxD = Math.max(...Object.values(dist), 1);
+      const labels = ['1','2','3','4','5+'];
+      distEl.innerHTML = labels.map(k => {
+        const v = dist[k] || 0;
+        const pct = Math.round((v/maxD)*100);
+        const share = totalClients > 0 ? Math.round((v/totalClients)*100) : 0;
+        const label = k === '1' ? '1 заказ (новые)' : k === '5+' ? '5+ заказов (лояльные)' : k + ' заказа';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;">
+          <div style="min-width:140px;color:var(--text2)">${label}</div>
+          <div style="flex:1;background:var(--bg3);border-radius:3px;height:6px;">
+            <div style="width:${pct}%;height:100%;background:${k==='1'?'#4a9eff':k==='5+'?'#2ecc71':'#9b59b6'};border-radius:3px;"></div>
+          </div>
+          <div style="min-width:40px;text-align:right;font-weight:700">${v}</div>
+          <div style="min-width:35px;text-align:right;color:var(--text3)">${share}%</div>
+        </div>`;
+      }).join('');
+    }
+
+  } catch(e) {
+    console.log('clients error:', e);
+    setBadge('clients-badge', '❌ Ошибка загрузки', '#ff6b6b', '#2d1a1a');
+  }
+}
+
 async function loadCancelsSection() {
   setBadge('cancel-badge', '⏳ Загружаем отмены...', '#555', '#1a1a1a');
   try {
