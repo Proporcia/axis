@@ -774,9 +774,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
         <div class="metric-delta" id="cl-repeat-pct"></div>
       </div>
       <div class="metric">
-        <div class="metric-label">Средний LTV</div>
+        <div class="metric-label">Ср. выручка/клиент</div>
         <div class="metric-val" id="cl-ltv">—</div>
-        <div class="metric-delta">выручка / клиент</div>
+        <div class="metric-delta">за текущий месяц</div>
       </div>
     </div>
 
@@ -1213,7 +1213,7 @@ async function loadClientsData() {
     updateEl('cl-total-orders', totalOrders.toLocaleString('ru'));
 
     setBadge('clients-badge',
-      '🟢 ' + totalClients + ' клиентов · ' + repeatPct + '% повторных · LTV ' + formatMoney(Math.round(avgLtv)),
+      '🟢 ' + totalClients + ' клиентов · ' + repeatPct + '% повторных · ' + formatMoney(Math.round(avgLtv)) + '/клиент',
       '#4caf50', '#1a2d1a'
     );
 
@@ -1224,34 +1224,44 @@ async function loadClientsData() {
     const periodEl = document.getElementById('cl-period');
     if (periodEl) periodEl.textContent = monthName.charAt(0).toUpperCase() + monthName.slice(1) + ' · с 1 по ' + dayNum + ' число';
 
-    // График новых клиентов по дням
-    const byDay = {};
+    // График новых и повторных клиентов по дням
+    const byDayNew = {};
+    const byDayRepeat = {};
     const knownPhones = new Set();
-    // Сортируем по дате чтобы правильно определить "новых"
     const sortedOrders = [...orders].sort((a,b) => new Date(a.order?.whenCreated) - new Date(b.order?.whenCreated));
     sortedOrders.forEach(o => {
       const phone = o.order?.customer?.phone || o.order?.phone || 'unknown';
-      const day = (o.order?.whenCreated||'').slice(8,10); // день месяца
+      const day = (o.order?.whenCreated||'').slice(8,10);
       if (!knownPhones.has(phone)) {
         knownPhones.add(phone);
-        byDay[day] = (byDay[day]||0) + 1;
+        byDayNew[day] = (byDayNew[day]||0) + 1;
+      } else {
+        byDayRepeat[day] = (byDayRepeat[day]||0) + 1;
       }
     });
 
     const chartCanvas = document.getElementById('ch-clients-days');
     if (chartCanvas) {
       const days = Array.from({length:dayNum}, (_,i) => String(i+1).padStart(2,'0'));
-      const vals = days.map(d => byDay[d]||0);
+      const mo = String(now2.getMonth()+1).padStart(2,'0');
       if (window._clientChart) window._clientChart.destroy();
       window._clientChart = new Chart(chartCanvas, {
         type: 'bar',
-        data: { labels: days.map(d=>d+'.04'), datasets: [{
-          data: vals, backgroundColor: 'rgba(46,204,113,0.6)', borderRadius: 3,
-          label: 'Новых клиентов'
-        }]},
-        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-          scales:{x:{grid:{display:false},ticks:{color:'#666',font:{size:10}}},
-            y:{grid:{color:'rgba(128,128,128,0.1)'},ticks:{color:'#666',font:{size:10},stepSize:1}}}}
+        data: {
+          labels: days.map(d => d + '.' + mo),
+          datasets: [
+            { data: days.map(d=>byDayNew[d]||0), backgroundColor: 'rgba(46,204,113,0.7)', borderRadius: 3, label: 'Новые' },
+            { data: days.map(d=>byDayRepeat[d]||0), backgroundColor: 'rgba(74,158,255,0.7)', borderRadius: 3, label: 'Повторные' }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: true, labels: { color: '#aaa', font: { size: 11 } } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#666', font: { size: 10 } } },
+            y: { grid: { color: 'rgba(128,128,128,0.1)' }, ticks: { color: '#666', font: { size: 10 }, stepSize: 1 } }
+          }
+        }
       });
     }
 
