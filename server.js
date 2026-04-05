@@ -40,7 +40,7 @@ function httpsGet(host, p, headers) {
   });
 }
 
-function httpsPost(host, p, body, headers) {
+function httpsPostRaw(host, p, body, extraHeaders) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const opts = {
@@ -48,7 +48,7 @@ function httpsPost(host, p, body, headers) {
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(data),
-        ...headers
+        ...(extraHeaders || {})
       }
     };
     const req = https.request(opts, res => {
@@ -65,7 +65,7 @@ function httpsPost(host, p, body, headers) {
 async function getIikoToken() {
   const now = Date.now();
   if (cachedToken && now < tokenExpiry) return cachedToken;
-  const r = await httpsPost(IIKO_BASE, '/api/1/access_token', { apiLogin: IIKO_API_LOGIN }, {});
+  const r = await httpsPostRaw(IIKO_BASE, '/api/1/access_token', { apiLogin: IIKO_API_LOGIN });
   cachedToken = r.token;
   tokenExpiry = now + 55 * 60 * 1000;
   return cachedToken;
@@ -97,23 +97,23 @@ const server = http.createServer(async (req, res) => {
       const endpoint = q.query.endpoint;
       const days = parseInt(q.query.days) || 1;
       const token = await getIikoToken();
+      const auth = { 'Authorization': 'Bearer ' + token };
       const dateFrom = days === 1 ? todayStr() + ' 00:00:00.000' : daysAgo(days);
       const dateTo = todayEnd();
       let result;
 
       if (endpoint === 'orders') {
-        result = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
+        result = await httpsPostRaw(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
           organizationIds: [ORG_ID], deliveryDateFrom: dateFrom, deliveryDateTo: dateTo,
           statuses: ['Delivered', 'Closed'], maxResults: 500
-        }, { 'Authorization': 'Bearer ' + token });
+        }, auth);
       } else if (endpoint === 'cancels') {
-        result = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
+        result = await httpsPostRaw(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
           organizationIds: [ORG_ID], deliveryDateFrom: dateFrom, deliveryDateTo: dateTo,
           statuses: ['Cancelled'], maxResults: 500
-        }, { 'Authorization': 'Bearer ' + token });
+        }, auth);
       } else if (endpoint === 'organizations') {
-        result = await httpsPost(IIKO_BASE, '/api/1/organizations', { organizationIds: [] },
-          { 'Authorization': 'Bearer ' + token });
+        result = await httpsPostRaw(IIKO_BASE, '/api/1/organizations', { organizationIds: [] }, auth);
       } else if (endpoint === 'month') {
         const now = new Date();
         const yr = now.getFullYear();
@@ -124,12 +124,12 @@ const server = http.createServer(async (req, res) => {
           const d = new Date(yr, mo, day);
           const dateStr = d.toISOString().slice(0, 10);
           try {
-            const r = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
+            const r = await httpsPostRaw(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
               organizationIds: [ORG_ID],
               deliveryDateFrom: dateStr + ' 00:00:00.000',
               deliveryDateTo: dateStr + ' 23:59:59.000',
               statuses: ['Delivered', 'Closed'], maxResults: 500
-            }, { 'Authorization': 'Bearer ' + token });
+            }, auth);
             const orders = r.ordersByOrganizations?.[0]?.orders || [];
             allOrders.push(...orders);
           } catch(e) {}
@@ -150,23 +150,21 @@ const server = http.createServer(async (req, res) => {
       const date1 = days === 1 ? 'today' : dateNDaysAgo(days);
       const date2 = 'today';
       const type = q.query.type || 'sources';
+      const mAuth = { 'Authorization': 'OAuth ' + METRIKA_TOKEN };
       let result;
 
-      if (type === 'sources') {
-        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastTrafficSource&date1=${date1}&date2=${date2}&limit=20`;
-        result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
-      } else if (type === 'sources-detail') {
+      if (type === 'sources-detail') {
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastSearchEngine,ym:s:lastTrafficSource&date1=${date1}&date2=${date2}&limit=30`;
-        result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
+        result = await httpsGet('api-metrika.yandex.net', p, mAuth);
       } else if (type === 'referrers') {
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastRefererDomain&date1=${date1}&date2=${date2}&limit=30`;
-        result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
+        result = await httpsGet('api-metrika.yandex.net', p, mAuth);
       } else if (type === 'utm') {
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:UTMSource,ym:s:UTMMedium,ym:s:UTMCampaign&date1=${date1}&date2=${date2}&limit=50`;
-        result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
+        result = await httpsGet('api-metrika.yandex.net', p, mAuth);
       } else if (type === 'summary') {
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:users,ym:s:bounceRate,ym:s:avgVisitDurationSeconds,ym:s:pageDepth,ym:s:newUsers&date1=${date1}&date2=${date2}`;
-        result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
+        result = await httpsGet('api-metrika.yandex.net', p, mAuth);
       }
 
       res.writeHead(200, cors);
@@ -178,44 +176,23 @@ const server = http.createServer(async (req, res) => {
 
   } else if (q.pathname === '/api/direct') {
     try {
-      const type = q.query.type || 'costs';
-      const days = parseInt(q.query.days) || 1;
-      const date1 = days === 1 ? todayStr() : dateNDaysAgo(days);
-      const date2 = todayStr();
-      let result;
+      const type = q.query.type || 'campaigns';
+      const dAuth = {
+        'Authorization': 'OAuth ' + DIRECT_TOKEN,
+        'Client-Login': DIRECT_LOGIN,
+        'Accept-Language': 'ru'
+      };
 
-      if (type === 'costs') {
-        // Расходы по кампаниям
-        result = await httpsPost('api.direct.yandex.com', '/json/v5/reports', {
-          params: {
-            SelectionCriteria: { DateFrom: date1, DateTo: date2 },
-            FieldNames: ['CampaignName', 'Impressions', 'Clicks', 'Cost'],
-            ReportName: 'axis_costs',
-            ReportType: 'CAMPAIGN_PERFORMANCE_REPORT',
-            DateRangeType: 'CUSTOM_DATE',
-            Format: 'TSV',
-            IncludeVAT: 'NO',
-            IncludeDiscount: 'NO'
-          }
-        }, {
-          'Authorization': 'OAuth ' + DIRECT_TOKEN,
-          'Client-Login': DIRECT_LOGIN,
-          'Accept-Language': 'ru',
-          'processingMode': 'auto'
-        });
-      } else if (type === 'campaigns') {
-        result = await httpsPost('api.direct.yandex.com', '/json/v5/campaigns', {
+      let result;
+      if (type === 'campaigns') {
+        result = await httpsPostRaw('api.direct.yandex.com', '/json/v5/campaigns', {
           method: 'get',
           params: {
             SelectionCriteria: {},
-            FieldNames: ['Id', 'Name', 'Status', 'Statistics'],
+            FieldNames: ['Id', 'Name', 'Status'],
             Page: { Limit: 50 }
           }
-        }, {
-          'Authorization': 'OAuth ' + DIRECT_TOKEN,
-          'Client-Login': DIRECT_LOGIN,
-          'Accept-Language': 'ru'
-        });
+        }, dAuth);
       }
 
       res.writeHead(200, cors);
