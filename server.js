@@ -111,6 +111,46 @@ const server = http.createServer(async (req, res) => {
         }, token);
       } else if (endpoint === 'organizations') {
         result = await httpsPost(IIKO_BASE, '/api/1/organizations', { organizationIds: [] }, token);
+      } else if (endpoint === 'month') {
+        // Собираем данные за текущий месяц по неделям
+        const now = new Date();
+        const yr = now.getFullYear();
+        const mo = now.getMonth();
+        const monthStart = new Date(yr, mo, 1);
+        const monthEnd = new Date(yr, mo+1, 0);
+        
+        // Разбиваем на недельные чанки
+        const chunks = [];
+        let chunkStart = new Date(monthStart);
+        while (chunkStart <= now) {
+          const chunkEnd = new Date(chunkStart);
+          chunkEnd.setDate(chunkEnd.getDate() + 6);
+          if (chunkEnd > now) chunkEnd.setTime(now.getTime());
+          
+          const fmt = d => d.toISOString().slice(0,10) + ' 00:00:00.000';
+          const fmtEnd = d => d.toISOString().slice(0,10) + ' 23:59:59.000';
+          
+          chunks.push({ from: fmt(chunkStart), to: fmtEnd(chunkEnd) });
+          chunkStart.setDate(chunkStart.getDate() + 7);
+        }
+        
+        // Запрашиваем каждый чанк
+        const allOrders = [];
+        for (const chunk of chunks) {
+          try {
+            const r = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
+              organizationIds: [ORG_ID],
+              deliveryDateFrom: chunk.from,
+              deliveryDateTo: chunk.to,
+              statuses: ['Delivered', 'Closed'],
+              maxResults: 500
+            }, token);
+            const orders = r.ordersByOrganizations?.[0]?.orders || [];
+            allOrders.push(...orders);
+          } catch(e) { /* пропускаем если чанк не загрузился */ }
+        }
+        
+        result = { ordersByOrganizations: [{ orders: allOrders }] };
       }
       res.writeHead(200, cors);
       res.end(JSON.stringify(result));
