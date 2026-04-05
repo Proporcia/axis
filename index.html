@@ -367,14 +367,10 @@ async function loadMonthPlan() {
   const daysLeft = daysInMonth - dayOfMonth;
   const currentMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
   try {
-    const res = await fetch('/api/iiko?endpoint=orders&days=' + dayOfMonth);
+    // Запрашиваем весь месяц через специальный endpoint (4 запроса по неделям)
+    const res = await fetch('/api/iiko?endpoint=month');
     const data = await res.json();
-    const allOrders = data.ordersByOrganizations?.[0]?.orders || [];
-    // Фильтруем только текущий месяц
-    const orders = allOrders.filter(o => {
-      const d = o.order?.whenCreated || '';
-      return d.startsWith(currentMonth);
-    });
+    const orders = data.ordersByOrganizations?.[0]?.orders || [];
     const monthRevenue = orders.reduce((sum, o) => {
       const pay = (o.order?.payments||[]).find(p => !p.isPreliminary);
       return sum + (pay?.sum || 0);
@@ -1007,28 +1003,71 @@ async function loadTrafficData(days) {
       }
     }
 
-    // UTM таблица
+    // UTM карточки сгруппированные по источнику
     const utms = (await utmRes.json()).data || [];
     const utmEl = document.getElementById('t-utm');
     if (utmEl) {
       if (utms.length === 0) {
         utmEl.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:10px 0">UTM-метки пока не обнаружены за период.<br>Появятся здесь когда запустите рекламу с UTM или рассылки через Сендлер.</div>';
       } else {
-        utmEl.innerHTML = `<div style="display:grid;grid-template-columns:120px 1fr 60px 60px;gap:6px;font-size:11px;color:var(--text3);padding-bottom:6px;border-bottom:1px solid var(--border);font-weight:700;">
-          <div>Источник</div><div>Кампания</div><div style="text-align:right">Визиты</div><div style="text-align:right">Покупки</div>
-        </div>` + utms.slice(0,15).map(u => {
-          const srcKey = (u.dimensions?.[0]?.name||'').toLowerCase();
-          const camp   = u.dimensions?.[2]?.name || u.dimensions?.[1]?.name || 'без названия';
-          const label  = UTM_SRC[srcKey] || ('🔗 '+(u.dimensions?.[0]?.name||'—'));
-          const v = Math.round(u.metrics?.[0]||0);
-          const g = Math.round(u.metrics?.[1]||0);
-          return `<div style="display:grid;grid-template-columns:120px 1fr 60px 60px;gap:6px;font-size:12px;padding:7px 0;border-bottom:1px solid var(--border);align-items:center;">
-            <div style="color:#4a9eff;font-size:11px">${label}</div>
-            <div style="color:var(--text2)">${camp}</div>
-            <div style="text-align:right;font-weight:700">${v}</div>
-            <div style="text-align:right;font-weight:700;color:#2ecc71">${g||'—'}</div>
+        // Группируем по источнику
+        const utmGroups = {};
+        utms.forEach(u => {
+          const srcRaw = (u.dimensions?.[0]?.name||'').toLowerCase();
+          const medium = (u.dimensions?.[1]?.name||'').toLowerCase();
+          const camp   = u.dimensions?.[2]?.name || '—';
+          const v = u.metrics?.[0]||0;
+          const g = u.metrics?.[1]||0;
+          const rev = u.metrics?.[2]||0;
+
+          // Определяем группу
+          let groupKey, groupLabel, groupIcon;
+          if (srcRaw.includes('yandex') || srcRaw === 'ya') {
+            if (medium === 'cpc') { groupKey='direct'; groupLabel='Яндекс.Директ'; groupIcon='📢'; }
+            else { groupKey='yandex_other'; groupLabel='Яндекс (другое)'; groupIcon='🔍'; }
+          } else if (srcRaw.includes('vk') || srcRaw === 'vk_ads') {
+            groupKey='vk'; groupLabel='ВКонтакте'; groupIcon='📱';
+          } else if (srcRaw.includes('senler')) {
+            groupKey='senler'; groupLabel='Сендлер'; groupIcon='💌';
+          } else if (srcRaw.includes('telegram')) {
+            groupKey='telegram'; groupLabel='Telegram'; groupIcon='✈️';
+          } else {
+            groupKey=srcRaw; groupLabel=u.dimensions?.[0]?.name||srcRaw; groupIcon='🔗';
+          }
+
+          if (!utmGroups[groupKey]) {
+            utmGroups[groupKey] = {label:groupLabel, icon:groupIcon, visits:0, purchases:0, revenue:0, campaigns:[]};
+          }
+          utmGroups[groupKey].visits    += v;
+          utmGroups[groupKey].purchases += g;
+          utmGroups[groupKey].revenue   += rev;
+          if (camp !== '—' && !utmGroups[groupKey].campaigns.includes(camp)) {
+            utmGroups[groupKey].campaigns.push(camp);
+          }
+        });
+
+        const maxV = Math.max(...Object.values(utmGroups).map(g=>g.visits), 1);
+
+        utmEl.innerHTML = '<div class="src-grid">' + Object.values(utmGroups).map(g => {
+          const bar = Math.round((g.visits/maxV)*100);
+          const campList = g.campaigns.slice(0,3).join(', ') + (g.campaigns.length > 3 ? '...' : '');
+          const revStr = g.revenue > 0 ? formatMoney(Math.round(g.revenue)) : '—';
+          return `<div class="src-card">
+            <div class="src-card-header">
+              <span class="src-card-icon">${g.icon}</span>
+              <div>
+                <div class="src-card-name">${g.label}</div>
+                <div class="src-card-hint" title="${g.campaigns.join(', ')}">${campList || 'нет данных'}</div>
+              </div>
+            </div>
+            <div class="src-card-bar"><div class="src-card-bar-fill" style="width:${bar}%;background:#9b59b6"></div></div>
+            <div class="src-card-stats">
+              <div class="src-card-stat"><span class="src-card-stat-label">Визитов</span><span class="src-card-stat-val">${Math.round(g.visits).toLocaleString('ru')}</span></div>
+              <div class="src-card-stat"><span class="src-card-stat-label">Покупок</span><span class="src-card-stat-val" style="color:#2ecc71">${Math.round(g.purchases)}</span></div>
+              <div class="src-card-stat"><span class="src-card-stat-label">Выручка</span><span class="src-card-stat-val">${revStr}</span></div>
+            </div>
           </div>`;
-        }).join('');
+        }).join('') + '</div>';
       }
     }
 
