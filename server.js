@@ -10,8 +10,11 @@ const IIKO_BASE = 'api-ru.iiko.services';
 const ORG_ID = 'd537096a-3641-4ea2-8733-c3a1c6088c0b';
 const ROOT = '/root/axis';
 
-const METRIKA_TOKEN = 'y0__xCHidczGJG5GCDG9_f4FjDarqHXCNxN10L5_MUdkEgfmF9W_r5Ejzqq';
+const METRIKA_TOKEN = 'y0__xCHidczGMXjPyCm2ev9FiLfNWnoX1WDuqLJpSmPgA3IaAMk';
 const METRIKA_COUNTER = '106964124';
+
+const DIRECT_TOKEN = 'y0__xCHidczGMXjPyCm2ev9FiLfNWnoX1WDuqLJpSmPgA3IaAMk';
+const DIRECT_LOGIN = 'porg-vujqd2em';
 
 const MIME = {
   '.html': 'text/html',
@@ -37,7 +40,7 @@ function httpsGet(host, p, headers) {
   });
 }
 
-function httpsPost(host, p, body, token) {
+function httpsPost(host, p, body, headers) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const opts = {
@@ -45,7 +48,7 @@ function httpsPost(host, p, body, token) {
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(data),
-        ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+        ...headers
       }
     };
     const req = https.request(opts, res => {
@@ -59,10 +62,10 @@ function httpsPost(host, p, body, token) {
   });
 }
 
-async function getToken() {
+async function getIikoToken() {
   const now = Date.now();
   if (cachedToken && now < tokenExpiry) return cachedToken;
-  const r = await httpsPost(IIKO_BASE, '/api/1/access_token', { apiLogin: IIKO_API_LOGIN });
+  const r = await httpsPost(IIKO_BASE, '/api/1/access_token', { apiLogin: IIKO_API_LOGIN }, {});
   cachedToken = r.token;
   tokenExpiry = now + 55 * 60 * 1000;
   return cachedToken;
@@ -72,18 +75,17 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function daysAgo(n) {
+function dateNDaysAgo(n) {
   const d = new Date(Date.now() - n * 86400000);
-  return d.toISOString().slice(0, 10) + ' 00:00:00.000';
+  return d.toISOString().slice(0, 10);
 }
 
 function todayEnd() {
   return todayStr() + ' 23:59:59.000';
 }
 
-function dateNDaysAgo(n) {
-  const d = new Date(Date.now() - n * 86400000);
-  return d.toISOString().slice(0, 10);
+function daysAgo(n) {
+  return dateNDaysAgo(n) + ' 00:00:00.000';
 }
 
 const server = http.createServer(async (req, res) => {
@@ -94,53 +96,47 @@ const server = http.createServer(async (req, res) => {
     try {
       const endpoint = q.query.endpoint;
       const days = parseInt(q.query.days) || 1;
-      const token = await getToken();
-      let result;
+      const token = await getIikoToken();
       const dateFrom = days === 1 ? todayStr() + ' 00:00:00.000' : daysAgo(days);
       const dateTo = todayEnd();
+      let result;
 
       if (endpoint === 'orders') {
         result = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
           organizationIds: [ORG_ID], deliveryDateFrom: dateFrom, deliveryDateTo: dateTo,
           statuses: ['Delivered', 'Closed'], maxResults: 500
-        }, token);
+        }, { 'Authorization': 'Bearer ' + token });
       } else if (endpoint === 'cancels') {
         result = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
           organizationIds: [ORG_ID], deliveryDateFrom: dateFrom, deliveryDateTo: dateTo,
           statuses: ['Cancelled'], maxResults: 500
-        }, token);
+        }, { 'Authorization': 'Bearer ' + token });
       } else if (endpoint === 'organizations') {
-        result = await httpsPost(IIKO_BASE, '/api/1/organizations', { organizationIds: [] }, token);
+        result = await httpsPost(IIKO_BASE, '/api/1/organizations', { organizationIds: [] },
+          { 'Authorization': 'Bearer ' + token });
       } else if (endpoint === 'month') {
-        // Собираем данные за текущий месяц по ОДНОМУ ДНЮ
-        // iiko ограничивает диапазон ~1-2 дня за запрос
         const now = new Date();
         const yr = now.getFullYear();
         const mo = now.getMonth();
         const dayOfMonth = now.getDate();
-        
         const allOrders = [];
-        // Запрашиваем каждый день с 1-го по сегодня
         for (let day = 1; day <= dayOfMonth; day++) {
           const d = new Date(yr, mo, day);
-          const dateStr = d.toISOString().slice(0,10);
-          const from = dateStr + ' 00:00:00.000';
-          const to   = dateStr + ' 23:59:59.000';
+          const dateStr = d.toISOString().slice(0, 10);
           try {
             const r = await httpsPost(IIKO_BASE, '/api/1/deliveries/by_delivery_date_and_status', {
               organizationIds: [ORG_ID],
-              deliveryDateFrom: from,
-              deliveryDateTo: to,
-              statuses: ['Delivered', 'Closed'],
-              maxResults: 500
-            }, token);
+              deliveryDateFrom: dateStr + ' 00:00:00.000',
+              deliveryDateTo: dateStr + ' 23:59:59.000',
+              statuses: ['Delivered', 'Closed'], maxResults: 500
+            }, { 'Authorization': 'Bearer ' + token });
             const orders = r.ordersByOrganizations?.[0]?.orders || [];
             allOrders.push(...orders);
-          } catch(e) { /* пропускаем день если ошибка */ }
+          } catch(e) {}
         }
-        
         result = { ordersByOrganizations: [{ orders: allOrders }] };
       }
+
       res.writeHead(200, cors);
       res.end(JSON.stringify(result));
     } catch(e) {
@@ -157,25 +153,69 @@ const server = http.createServer(async (req, res) => {
       let result;
 
       if (type === 'sources') {
-        // ecommerce: визиты, покупки, выручка по источникам
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastTrafficSource&date1=${date1}&date2=${date2}&limit=20`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       } else if (type === 'sources-detail') {
-        // Детализация по поисковику + тип источника
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastSearchEngine,ym:s:lastTrafficSource&date1=${date1}&date2=${date2}&limit=30`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       } else if (type === 'referrers') {
-        // Домены рефереров — 2ГИС (link.2gis.ru), ВК (away.vk.ru, m.vk.ru) и др.
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:lastRefererDomain&date1=${date1}&date2=${date2}&limit=30`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       } else if (type === 'utm') {
-        // UTM campaigns
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:ecommercePurchases,ym:s:ecommerceRevenue&dimensions=ym:s:UTMSource,ym:s:UTMMedium,ym:s:UTMCampaign&date1=${date1}&date2=${date2}&limit=50`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
       } else if (type === 'summary') {
-        // Summary visits
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:users,ym:s:bounceRate,ym:s:avgVisitDurationSeconds,ym:s:pageDepth,ym:s:newUsers&date1=${date1}&date2=${date2}`;
         result = await httpsGet('api-metrika.yandex.net', p, { 'Authorization': 'OAuth ' + METRIKA_TOKEN });
+      }
+
+      res.writeHead(200, cors);
+      res.end(JSON.stringify(result));
+    } catch(e) {
+      res.writeHead(500, cors);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+
+  } else if (q.pathname === '/api/direct') {
+    try {
+      const type = q.query.type || 'costs';
+      const days = parseInt(q.query.days) || 1;
+      const date1 = days === 1 ? todayStr() : dateNDaysAgo(days);
+      const date2 = todayStr();
+      let result;
+
+      if (type === 'costs') {
+        // Расходы по кампаниям
+        result = await httpsPost('api.direct.yandex.com', '/json/v5/reports', {
+          params: {
+            SelectionCriteria: { DateFrom: date1, DateTo: date2 },
+            FieldNames: ['CampaignName', 'Impressions', 'Clicks', 'Cost'],
+            ReportName: 'axis_costs',
+            ReportType: 'CAMPAIGN_PERFORMANCE_REPORT',
+            DateRangeType: 'CUSTOM_DATE',
+            Format: 'TSV',
+            IncludeVAT: 'NO',
+            IncludeDiscount: 'NO'
+          }
+        }, {
+          'Authorization': 'OAuth ' + DIRECT_TOKEN,
+          'Client-Login': DIRECT_LOGIN,
+          'Accept-Language': 'ru',
+          'processingMode': 'auto'
+        });
+      } else if (type === 'campaigns') {
+        result = await httpsPost('api.direct.yandex.com', '/json/v5/campaigns', {
+          method: 'get',
+          params: {
+            SelectionCriteria: {},
+            FieldNames: ['Id', 'Name', 'Status', 'Statistics'],
+            Page: { Limit: 50 }
+          }
+        }, {
+          'Authorization': 'OAuth ' + DIRECT_TOKEN,
+          'Client-Login': DIRECT_LOGIN,
+          'Accept-Language': 'ru'
+        });
       }
 
       res.writeHead(200, cors);
