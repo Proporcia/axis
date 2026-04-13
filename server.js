@@ -165,6 +165,10 @@ const server = http.createServer(async (req, res) => {
       } else if (type === 'summary') {
         const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:visits,ym:s:users,ym:s:bounceRate,ym:s:avgVisitDurationSeconds,ym:s:pageDepth,ym:s:newUsers&date1=${date1}&date2=${date2}`;
         result = await httpsGet('api-metrika.yandex.net', p, mAuth);
+      } else if (type === 'funnel') {
+        // Воронка: корзина → оформление → покупка
+        const p = `/stat/v1/data?id=${METRIKA_COUNTER}&metrics=ym:s:goal515098397reaches,ym:s:goal515098485reaches,ym:s:goal515098487reaches&date1=${date1}&date2=${date2}`;
+        result = await httpsGet('api-metrika.yandex.net', p, mAuth);
       }
 
       res.writeHead(200, cors);
