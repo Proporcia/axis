@@ -960,12 +960,13 @@ async function loadTrafficData(days) {
   };
 
   try {
-    const [ordRes, sumRes, srcRes, refRes, utmRes] = await Promise.all([
+    const [ordRes, sumRes, srcRes, refRes, utmRes, funnelRes] = await Promise.all([
       fetch('/api/iiko?endpoint=orders&days=' + days),
       fetch('/api/metrika?type=summary&days=' + days),
       fetch('/api/metrika?type=sources-detail&days=' + days),
       fetch('/api/metrika?type=referrers&days=' + days),
       fetch('/api/metrika?type=utm&days=' + days),
+      fetch('/api/metrika?type=funnel&days=' + days),
     ]);
 
     const orders = (await ordRes.json()).ordersByOrganizations?.[0]?.orders || [];
@@ -1007,6 +1008,27 @@ async function loadTrafficData(days) {
 
     updateEl('t-visits', Math.round(visits).toLocaleString('ru'));
     updateEl('t-visits-d', 'уникальных: ' + Math.round(users).toLocaleString('ru'));
+
+    // Воронка
+    const funnelM = (await funnelRes.json()).data?.[0]?.metrics || [];
+    const fCart     = Math.round(funnelM[0]||0);
+    const fCheckout = Math.round(funnelM[1]||0);
+    const fBought   = Math.round(funnelM[2]||0);
+    const fAbandoned = Math.max(0, fCart - fBought);
+    const cartPct     = visits > 0 ? Math.round((fCart/visits)*100) : 0;
+    const checkoutPct = visits > 0 ? Math.round((fCheckout/visits)*100) : 0;
+    const boughtPct   = visits > 0 ? Math.round((fBought/visits)*100) : 0;
+    const abandonedRev = avgCheck > 0 ? formatMoney(Math.round(fAbandoned * avgCheck)) : '—';
+
+    updateEl('t-visits-funnel', Math.round(visits).toLocaleString('ru'));
+    updateEl('t-cart', fCart.toLocaleString('ru'));
+    updateEl('t-cart-pct', cartPct + '% от визитов');
+    updateEl('t-checkout', fCheckout.toLocaleString('ru'));
+    updateEl('t-checkout-pct', checkoutPct + '% от визитов');
+    updateEl('t-purchased', fBought.toLocaleString('ru'));
+    updateEl('t-purchased-pct', boughtPct + '% конверсия');
+    updateEl('t-abandoned', fAbandoned.toLocaleString('ru'));
+    updateEl('t-abandoned-rev', abandonedRev);
     updateEl('t-goals', Math.round(totalGoals).toLocaleString('ru'));
     updateEl('t-est-rev', totalMetRev > 0 ? formatMoney(Math.round(totalMetRev)) : (totalGoals > 0 && avgCheck > 0 ? formatMoney(Math.round(totalGoals*avgCheck)) : '—'));
     updateEl('t-conv', conv.toFixed(1) + '%');
