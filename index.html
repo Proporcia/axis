@@ -916,6 +916,7 @@ function setPeriod(p, btn) {
   document.getElementById('cal-toggle-btn').textContent = '📅 Период';
   const daysMap = {d1:1, w1:7, w2:14, m1:30, m3:90};
   const days = daysMap[p];
+  currentDays = days;
   loadMainData(days);
   // Обновляем активную вкладку
   const activeSection = document.querySelector('.section.active');
@@ -1004,9 +1005,10 @@ async function loadTrafficData(days) {
       fetch('/api/metrika?type=funnel&days=' + days),
     ]);
 
-    const orders = (await ordRes.json()).ordersByOrganizations?.[0]?.orders || [];
+    let orders = [];
+    try { orders = (await ordRes.json()).ordersByOrganizations?.[0]?.orders || []; } catch(e) {}
     const totalRev = orders.reduce((s,o)=>{const p=(o.order?.payments||[]).find(p=>!p.isPreliminary);return s+(p?.sum||0);},0);
-    const avgCheck = orders.length > 0 ? totalRev / orders.length : 0;
+    const avgCheck = orders.length > 0 ? totalRev / orders.length : 2500; // 2500 как запасной средний чек
 
     const sumM = (await sumRes.json()).data?.[0]?.metrics || [];
     const visits=sumM[0]||0, users=sumM[1]||0, bounce=sumM[2]||0;
@@ -1053,7 +1055,10 @@ async function loadTrafficData(days) {
     const cartPct     = visits > 0 ? Math.round((fCart/visits)*100) : 0;
     const checkoutPct = visits > 0 ? Math.round((fCheckout/visits)*100) : 0;
     const boughtPct   = visits > 0 ? Math.round((fBought/visits)*100) : 0;
-    const abandonedRev = avgCheck > 0 ? formatMoney(Math.round(fAbandoned * avgCheck)) : '—';
+    // avgCheck может быть 0 если iiko не отдал данные за период — используем запасное значение
+    // Если iiko не отдал данные (большой период) — берём 2500 как средний чек
+    const effectiveCheck = avgCheck > 0 ? avgCheck : 2500;
+    const abandonedRev = fAbandoned > 0 ? formatMoney(Math.round(fAbandoned * effectiveCheck)) : '0 ₽';
 
     updateEl('t-visits-funnel', Math.round(visits).toLocaleString('ru'));
     updateEl('t-cart', fCart.toLocaleString('ru'));
