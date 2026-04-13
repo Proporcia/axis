@@ -905,7 +905,7 @@ function showSection(id, el) {
   document.getElementById('cal-popup').classList.remove('show');
 
   if (id === 'cancels') loadCancelsSection();
-  if (id === 'traffic') loadTrafficData();
+  if (id === 'traffic') loadTrafficData(currentDays);
   if (id === 'clients') loadClientsData();
 }
 
@@ -923,6 +923,7 @@ function setPeriod(p, btn) {
     const id = activeSection.id.replace('section-','');
     if (id === 'traffic') loadTrafficData(days);
     if (id === 'cancels') loadCancelsSection();
+    if (id === 'clients') loadClientsData();
   }
 }
 
