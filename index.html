@@ -687,6 +687,40 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-s
   <div class="section" id="section-traffic">
     <div id="traffic-badge" class="badge">⏳ Загружаем данные Метрики...</div>
 
+    <!-- Воронка продаж -->
+    <div class="panel" style="margin-bottom:12px;">
+      <div class="panel-title">🛒 Воронка продаж</div>
+      <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;">
+        <div style="flex:1;text-align:center;padding:10px 6px;border-right:1px solid var(--border);">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Визитов</div>
+          <div style="font-size:18px;font-weight:700;" id="t-visits-funnel">—</div>
+          <div style="font-size:10px;color:var(--text3)">100%</div>
+        </div>
+        <div style="font-size:16px;color:var(--text3);padding:0 4px;">→</div>
+        <div style="flex:1;text-align:center;padding:10px 6px;border-right:1px solid var(--border);">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Корзина</div>
+          <div style="font-size:18px;font-weight:700;" id="t-cart">—</div>
+          <div style="font-size:10px;color:var(--text3);" id="t-cart-pct">—%</div>
+        </div>
+        <div style="font-size:16px;color:var(--text3);padding:0 4px;">→</div>
+        <div style="flex:1;text-align:center;padding:10px 6px;border-right:1px solid var(--border);">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Оформление</div>
+          <div style="font-size:18px;font-weight:700;" id="t-checkout">—</div>
+          <div style="font-size:10px;color:var(--text3);" id="t-checkout-pct">—%</div>
+        </div>
+        <div style="font-size:16px;color:var(--text3);padding:0 4px;">→</div>
+        <div style="flex:1;text-align:center;padding:10px 6px;">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;">Покупка</div>
+          <div style="font-size:18px;font-weight:700;color:#2ecc71;" id="t-purchased">—</div>
+          <div style="font-size:10px;color:#2ecc71;" id="t-purchased-pct">—%</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding:8px 10px;background:rgba(244,67,54,0.08);border-radius:6px;border:1px solid rgba(244,67,54,0.2);font-size:12px;">
+        🛒 Бросили корзину: <b id="t-abandoned" style="color:#f44336">—</b> чел. · 
+        ~потеряно: <b id="t-abandoned-rev" style="color:#f44336">—</b>
+      </div>
+    </div>
+
     <!-- Блок 1: Сводка -->
     <div class="metrics">
       <div class="metric">
